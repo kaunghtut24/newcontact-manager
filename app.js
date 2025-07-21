@@ -1181,6 +1181,12 @@ class ContactManager {
 
     // OCR and Card Scanning
     async handleCardUpload(file) {
+        console.log('🔄 Starting card upload process:', {
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type
+        });
+
         if (!file.type.startsWith('image/')) {
             this.showToast('Please upload an image file', 'error');
             return;
@@ -1203,23 +1209,52 @@ class ContactManager {
         }
         
         try {
+            console.log('📋 Ensuring scan view is loaded...');
             // Ensure we're on the scan view
             if (this.currentView !== 'scan-card') {
                 this.showView('scan-card');
-                // Wait a bit for the view to load
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // Wait for the view to load and DOM elements to be available
+                await new Promise(resolve => setTimeout(resolve, 200));
             }
 
+            // Double-check that required elements exist
+            const scanResults = document.getElementById('scan-results');
+            const extractedDataElement = document.getElementById('extracted-data');
+            const ocrProgress = document.getElementById('ocr-progress');
+
+            console.log('🔍 Checking DOM elements:', {
+                scanResults: !!scanResults,
+                extractedDataElement: !!extractedDataElement,
+                ocrProgress: !!ocrProgress
+            });
+
+            if (!scanResults || !extractedDataElement) {
+                console.error('❌ Required DOM elements not found, forcing view reload...');
+                this.showView('scan-card');
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            console.log('🖼️ Starting image preprocessing...');
             // Preprocess image for faster OCR
             const processedImageUrl = await this.preprocessImage(file);
-            const ocrResult = await this.performOCR(processedImageUrl);
-            const extractedData = this.parseOCRText(ocrResult);
+            console.log('✅ Image preprocessing complete');
 
+            console.log('🔍 Starting OCR processing...');
+            const ocrResult = await this.performOCR(processedImageUrl);
+            console.log('✅ OCR processing complete, result length:', ocrResult?.length || 0);
+
+            console.log('📝 Parsing OCR text...');
+            const extractedData = this.parseOCRText(ocrResult);
+            console.log('✅ Text parsing complete:', extractedData);
+
+            console.log('📊 Displaying scan results...');
             this.displayScanResults(extractedData, processedImageUrl);
             this.hideLoading();
+            console.log('✅ Card upload process complete');
             
         } catch (error) {
-            console.error('OCR Error:', error);
+            console.error('❌ OCR Error:', error);
+            console.error('Error stack:', error.stack);
 
             // Show user-friendly error message with fallback option
             const errorMessage = error.message || 'Failed to process image';
@@ -1396,40 +1431,53 @@ class ContactManager {
     }
 
     async performOCR(imageUrl) {
+        console.log('🔍 performOCR called with imageUrl:', imageUrl);
         const progressContainer = document.getElementById('ocr-progress');
         const progressBar = document.querySelector('.progress-fill');
         const progressText = document.querySelector('.progress-text');
 
         try {
+            console.log('📊 Setting up progress indicators...');
             // Show progress container
             if (progressContainer) {
                 progressContainer.classList.remove('hidden');
+                console.log('✅ Progress container shown');
+            } else {
+                console.warn('⚠️ Progress container not found');
             }
 
             // Update progress text
             if (progressText) {
                 progressText.textContent = 'Initializing OCR...';
+                console.log('✅ Progress text updated');
             }
 
             // Check if Tesseract is available
+            console.log('🔍 Checking Tesseract availability...');
             if (typeof Tesseract === 'undefined') {
+                console.error('❌ Tesseract.js not loaded');
                 throw new Error('Tesseract.js library not loaded. Please check your internet connection.');
             }
+            console.log('✅ Tesseract.js is available');
 
             if (progressText) {
                 progressText.textContent = 'Processing image...';
             }
 
+            console.log('🚀 Starting Tesseract.recognize...');
             // Use Tesseract.recognize directly without workers to avoid cloning issues
             const result = await Tesseract.recognize(imageUrl, 'eng', {
                 logger: (m) => {
+                    console.log('📊 OCR Progress:', m);
                     if (m.status === 'recognizing text' && progressBar && progressText) {
                         const progress = Math.round(m.progress * 100);
                         progressBar.style.width = progress + '%';
                         progressText.textContent = `Processing image... ${progress}%`;
+                        console.log(`📈 Progress: ${progress}%`);
                     }
                 }
             });
+            console.log('✅ Tesseract.recognize completed');
 
             if (progressContainer) {
                 progressContainer.classList.add('hidden');
@@ -1532,20 +1580,42 @@ class ContactManager {
     }
 
     displayScanResults(extractedData, imageUrl) {
-        const scanResults = document.getElementById('scan-results');
-        const container = document.getElementById('extracted-data');
+        console.log('📊 displayScanResults called with:', { extractedData, imageUrl });
 
-        if (!scanResults) {
-            console.error('scan-results element not found');
-            this.showToast('Error displaying results', 'error');
-            return;
+        // Ensure we're on the scan view first
+        if (this.currentView !== 'scan-card') {
+            console.log('🔄 Switching to scan view...');
+            this.showView('scan-card');
         }
 
-        if (!container) {
-            console.error('extracted-data element not found');
-            this.showToast('Error displaying extracted data', 'error');
-            return;
-        }
+        // Wait a moment for DOM to be ready
+        setTimeout(() => {
+            const scanResults = document.getElementById('scan-results');
+            const container = document.getElementById('extracted-data');
+
+            console.log('🔍 DOM elements check:', {
+                scanResults: !!scanResults,
+                container: !!container
+            });
+
+            if (!scanResults) {
+                console.error('❌ scan-results element not found');
+                this.showToast('Error displaying results - scan view not loaded', 'error');
+                return;
+            }
+
+            if (!container) {
+                console.error('❌ extracted-data element not found');
+                this.showToast('Error displaying extracted data - container not found', 'error');
+                return;
+            }
+
+            this._renderScanResults(scanResults, container, extractedData, imageUrl);
+        }, 100);
+    }
+
+    _renderScanResults(scanResults, container, extractedData, imageUrl) {
+        console.log('✅ Rendering scan results...');
 
         scanResults.classList.remove('hidden');
 
@@ -1564,6 +1634,7 @@ class ContactManager {
         `;
 
         this.scannedContactData = extractedData;
+        console.log('✅ Scan results rendered successfully');
     }
 
     async saveScannedContact() {
