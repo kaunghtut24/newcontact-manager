@@ -1771,13 +1771,19 @@ class ContactManager {
 
             console.log('🚀 Starting Tesseract.recognize...');
 
-            // Try multiple approaches to ensure Tesseract works with CSP
+            // Create a worker with explicit configuration to avoid CSP issues
+            console.log('🔄 Creating Tesseract worker with explicit configuration...');
+
+            let worker;
             let result;
 
             try {
-                console.log('🔄 Attempting OCR with explicit unpkg.com paths...');
-                // First attempt: Force unpkg.com paths
-                result = await Tesseract.recognize(imageUrl, 'eng', {
+                // Try to create worker with explicit unpkg.com paths first
+                console.log('🔄 Attempting to create worker with unpkg.com...');
+                worker = await Tesseract.createWorker('eng', 1, {
+                    workerPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/worker.min.js',
+                    langPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/',
+                    corePath: 'https://unpkg.com/tesseract.js@4.1.1/dist/',
                     logger: (m) => {
                         console.log('📊 OCR Progress:', m);
                         if (m.status === 'recognizing text' && progressBar && progressText) {
@@ -1786,16 +1792,18 @@ class ContactManager {
                             progressText.textContent = `Processing image... ${progress}%`;
                             console.log(`📈 Progress: ${progress}%`);
                         }
-                    },
-                    // Force unpkg.com to match our CSP
-                    workerPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/worker.min.js',
-                    langPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/',
-                    corePath: 'https://unpkg.com/tesseract.js@4.1.1/dist/'
+                    }
                 });
-            } catch (unpkgError) {
-                console.log('⚠️ unpkg.com failed, trying cdnjs.cloudflare.com...');
+
+                console.log('✅ Worker created successfully');
+                result = await worker.recognize(imageUrl);
+                await worker.terminate();
+
+            } catch (workerError) {
+                console.log('⚠️ Worker creation failed, trying direct recognize...');
+
+                // Fallback to direct recognize with explicit paths
                 try {
-                    // Second attempt: Use cdnjs.cloudflare.com
                     result = await Tesseract.recognize(imageUrl, 'eng', {
                         logger: (m) => {
                             console.log('📊 OCR Progress:', m);
@@ -1806,25 +1814,14 @@ class ContactManager {
                                 console.log(`📈 Progress: ${progress}%`);
                             }
                         },
-                        // Try cdnjs as fallback
-                        workerPath: 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/worker.min.js',
-                        langPath: 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/',
-                        corePath: 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/'
+                        // Force unpkg.com paths
+                        workerPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/worker.min.js',
+                        langPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/',
+                        corePath: 'https://unpkg.com/tesseract.js@4.1.1/dist/'
                     });
-                } catch (cdnjsError) {
-                    console.log('⚠️ cdnjs failed, trying default configuration...');
-                    // Final attempt: Default configuration (should work with updated CSP)
-                    result = await Tesseract.recognize(imageUrl, 'eng', {
-                        logger: (m) => {
-                            console.log('📊 OCR Progress:', m);
-                            if (m.status === 'recognizing text' && progressBar && progressText) {
-                                const progress = Math.round(m.progress * 100);
-                                progressBar.style.width = progress + '%';
-                                progressText.textContent = `Processing image... ${progress}%`;
-                                console.log(`📈 Progress: ${progress}%`);
-                            }
-                        }
-                    });
+                } catch (recognizeError) {
+                    console.log('⚠️ All attempts failed, throwing error...');
+                    throw recognizeError;
                 }
             }
             console.log('✅ Tesseract.recognize completed');

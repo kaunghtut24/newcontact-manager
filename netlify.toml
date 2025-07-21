@@ -23,7 +23,7 @@
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdnjs.cloudflare.com blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://unpkg.com; font-src 'self' data:; worker-src 'self' blob: data:; child-src 'self' blob: data:; object-src 'none';"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net blob:; script-src-elem 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net blob:; worker-src 'self' blob: https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://api.openai.com https://api.anthropic.com https://openrouter.ai https://api.together.xyz https://api.groq.com https://api.cohere.ai https://*.openai.com https://*.anthropic.com https://*.together.xyz https://*.groq.com https://*.cohere.ai; img-src 'self' data: blob:; font-src 'self' data:; manifest-src 'self'; object-src 'none'"
 
 [[headers]]
   # Cache static assets
