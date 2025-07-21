@@ -580,13 +580,24 @@ class ContactManager {
 
     // View Management
     showView(viewName) {
+        console.log(`🔄 showView called: ${this.currentView} → ${viewName}`);
+
         // Update navigation
         document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector(`[data-view="${viewName}"]`).classList.add('active');
+        const navBtn = document.querySelector(`[data-view="${viewName}"]`);
+        if (navBtn) {
+            navBtn.classList.add('active');
+        }
 
         // Update content
         document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-        document.getElementById(viewName).classList.add('active');
+        const targetView = document.getElementById(viewName);
+        if (targetView) {
+            targetView.classList.add('active');
+            console.log(`✅ View ${viewName} activated`);
+        } else {
+            console.error(`❌ View element ${viewName} not found`);
+        }
 
         this.currentView = viewName;
 
@@ -1588,30 +1599,106 @@ class ContactManager {
             this.showView('scan-card');
         }
 
-        // Wait a moment for DOM to be ready
-        setTimeout(() => {
-            const scanResults = document.getElementById('scan-results');
-            const container = document.getElementById('extracted-data');
+        // Use a more robust approach with retries
+        this._waitForScanElements(extractedData, imageUrl, 0);
+    }
 
-            console.log('🔍 DOM elements check:', {
-                scanResults: !!scanResults,
-                container: !!container
+    _waitForScanElements(extractedData, imageUrl, retryCount = 0) {
+        const maxRetries = 5;
+        const delay = 100 + (retryCount * 50); // Increasing delay
+
+        console.log(`🔍 Attempt ${retryCount + 1}/${maxRetries} - Checking for scan elements...`);
+
+        const scanResults = document.getElementById('scan-results');
+        const scanCardView = document.getElementById('scan-card');
+
+        // First, ensure scan-results is visible so we can access its children
+        if (scanResults) {
+            scanResults.classList.remove('hidden');
+            console.log('👁️ Made scan-results visible');
+        }
+
+        // Now try to find the container
+        const container = document.getElementById('extracted-data');
+
+        console.log('🔍 DOM elements status:', {
+            scanCardView: !!scanCardView,
+            scanCardActive: scanCardView?.classList.contains('active'),
+            scanResults: !!scanResults,
+            scanResultsHidden: scanResults?.classList.contains('hidden'),
+            container: !!container,
+            currentView: this.currentView
+        });
+
+        // Also try alternative methods to find the container
+        if (!container && scanResults) {
+            const containerByQuery = scanResults.querySelector('#extracted-data');
+            const containerByClass = scanResults.querySelector('.extracted-data');
+            console.log('🔍 Alternative container search:', {
+                byQuery: !!containerByQuery,
+                byClass: !!containerByClass
             });
 
-            if (!scanResults) {
-                console.error('❌ scan-results element not found');
-                this.showToast('Error displaying results - scan view not loaded', 'error');
+            if (containerByQuery || containerByClass) {
+                const foundContainer = containerByQuery || containerByClass;
+                console.log('✅ Found container via alternative method');
+                this._renderScanResults(scanResults, foundContainer, extractedData, imageUrl);
                 return;
             }
+        }
 
-            if (!container) {
-                console.error('❌ extracted-data element not found');
-                this.showToast('Error displaying extracted data - container not found', 'error');
-                return;
-            }
-
+        if (scanResults && container) {
+            console.log('✅ All elements found, rendering results...');
             this._renderScanResults(scanResults, container, extractedData, imageUrl);
-        }, 100);
+            return;
+        }
+
+        if (retryCount < maxRetries) {
+            console.log(`⏳ Elements not ready, retrying in ${delay}ms...`);
+            if (retryCount === 2) {
+                // Debug on third attempt
+                this.debugScanElements();
+            }
+            setTimeout(() => {
+                this._waitForScanElements(extractedData, imageUrl, retryCount + 1);
+            }, delay);
+        } else {
+            console.error('❌ Failed to find scan elements after all retries');
+            this.debugScanElements();
+
+            // Try to create the missing container as a last resort
+            if (scanResults && !container) {
+                console.log('🛠️ Attempting to create missing extracted-data container...');
+                const newContainer = document.createElement('div');
+                newContainer.id = 'extracted-data';
+                newContainer.className = 'extracted-data';
+
+                // Find the right place to insert it (after the progress bar)
+                const progressBar = scanResults.querySelector('#ocr-progress');
+                if (progressBar) {
+                    progressBar.parentNode.insertBefore(newContainer, progressBar.nextSibling);
+                } else {
+                    // Just append to the card body
+                    const cardBody = scanResults.querySelector('.card__body');
+                    if (cardBody) {
+                        cardBody.appendChild(newContainer);
+                    }
+                }
+
+                console.log('✅ Created missing container, attempting to render...');
+                this._renderScanResults(scanResults, newContainer, extractedData, imageUrl);
+                return;
+            }
+
+            this.showToast('Error displaying scan results. Please try scanning again.', 'error');
+
+            // Force a complete view reset
+            console.log('🔄 Forcing complete view reset...');
+            this.showView('dashboard');
+            setTimeout(() => {
+                this.showView('scan-card');
+            }, 200);
+        }
     }
 
     _renderScanResults(scanResults, container, extractedData, imageUrl) {
@@ -1635,6 +1722,55 @@ class ContactManager {
 
         this.scannedContactData = extractedData;
         console.log('✅ Scan results rendered successfully');
+    }
+
+    // Diagnostic function to check DOM structure
+    debugScanElements() {
+        console.log('🔍 DOM Structure Debug:');
+        console.log('Current view:', this.currentView);
+
+        const scanCard = document.getElementById('scan-card');
+        const scanResults = document.getElementById('scan-results');
+        const extractedData = document.getElementById('extracted-data');
+        const ocrProgress = document.getElementById('ocr-progress');
+
+        console.log('Elements found:', {
+            'scan-card': !!scanCard,
+            'scan-card active': scanCard?.classList.contains('active'),
+            'scan-results': !!scanResults,
+            'scan-results hidden': scanResults?.classList.contains('hidden'),
+            'extracted-data': !!extractedData,
+            'ocr-progress': !!ocrProgress
+        });
+
+        if (scanCard) {
+            console.log('scan-card classes:', Array.from(scanCard.classList));
+        }
+        if (scanResults) {
+            console.log('scan-results classes:', Array.from(scanResults.classList));
+            console.log('scan-results innerHTML length:', scanResults.innerHTML.length);
+
+            // Check for extracted-data within scan-results
+            const childExtractedData = scanResults.querySelector('#extracted-data');
+            const childByClass = scanResults.querySelector('.extracted-data');
+            console.log('Children search:', {
+                'querySelector #extracted-data': !!childExtractedData,
+                'querySelector .extracted-data': !!childByClass
+            });
+
+            // List all children with IDs
+            const childrenWithIds = Array.from(scanResults.querySelectorAll('[id]')).map(el => el.id);
+            console.log('All children with IDs:', childrenWithIds);
+        }
+    }
+
+    // Test function that can be called from browser console
+    testScanView() {
+        console.log('🧪 Testing scan view...');
+        this.showView('scan-card');
+        setTimeout(() => {
+            this.debugScanElements();
+        }, 500);
     }
 
     async saveScannedContact() {
