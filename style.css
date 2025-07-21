@@ -1683,6 +1683,79 @@ select.form-control {
   color: var(--color-text-secondary);
 }
 
+.fallback-image {
+  margin-bottom: var(--space-16);
+}
+
+.fallback-image img {
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
+}
+
+.fallback-actions {
+  display: flex;
+  gap: var(--space-12);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Manual extraction styles */
+.manual-extraction {
+  text-align: left;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.extraction-image {
+  text-align: center;
+  margin-bottom: var(--space-24);
+}
+
+.extraction-form h3 {
+  margin-bottom: var(--space-8);
+  color: var(--color-text);
+}
+
+.extraction-form p {
+  margin-bottom: var(--space-16);
+  color: var(--color-text-secondary);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-12);
+  margin-bottom: var(--space-24);
+}
+
+.extraction-actions {
+  display: flex;
+  gap: var(--space-12);
+  justify-content: center;
+}
+
+@media (max-width: 480px) {
+  .fallback-actions {
+    flex-direction: column;
+  }
+
+  .fallback-actions .btn {
+    width: 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .extraction-actions {
+    flex-direction: column;
+  }
+
+  .extraction-actions .btn {
+    width: 100%;
+  }
+}
+
 /* Camera Modal Styles */
 .camera-modal {
   position: fixed;

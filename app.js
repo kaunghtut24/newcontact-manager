@@ -1186,14 +1186,29 @@ class ContactManager {
             return;
         }
 
-        this.showLoading();
+        // Show immediate feedback
+        this.showLoading('Preparing image...');
+
+        // Show image preview immediately
+        const imageUrl = URL.createObjectURL(file);
+        const scanResults = document.getElementById('scan-results');
+        if (scanResults) {
+            scanResults.innerHTML = `
+                <div class="image-preview">
+                    <img src="${imageUrl}" alt="Business card preview" style="max-width: 100%; max-height: 300px; border-radius: 8px; margin-bottom: 16px;">
+                    <p>Processing image with OCR...</p>
+                </div>
+            `;
+            scanResults.classList.remove('hidden');
+        }
         
         try {
-            const imageUrl = URL.createObjectURL(file);
-            const ocrResult = await this.performOCR(imageUrl);
+            // Preprocess image for faster OCR
+            const processedImageUrl = await this.preprocessImage(file);
+            const ocrResult = await this.performOCR(processedImageUrl);
             const extractedData = this.parseOCRText(ocrResult);
-            
-            this.displayScanResults(extractedData, imageUrl);
+
+            this.displayScanResults(extractedData, processedImageUrl);
             this.hideLoading();
             
         } catch (error) {
@@ -1204,14 +1219,25 @@ class ContactManager {
             this.showToast(errorMessage + ' You can still add contact details manually.', 'error');
             this.hideLoading();
 
-            // Offer manual entry as fallback
+            // Show image and offer manual entry as fallback
             const fallbackMessage = document.createElement('div');
             fallbackMessage.className = 'scan-fallback';
             fallbackMessage.innerHTML = `
-                <p>OCR processing failed, but you can:</p>
-                <button class="btn btn--primary" onclick="contactManager.showView('add-contact')">
-                    Add Contact Manually
-                </button>
+                <div class="fallback-image">
+                    <img src="${URL.createObjectURL(file)}" alt="Business card" style="max-width: 300px; max-height: 200px; border-radius: 8px; margin-bottom: 16px;">
+                </div>
+                <p>OCR processing failed, but you can view the image above and:</p>
+                <div class="fallback-actions">
+                    <button class="btn btn--primary" onclick="contactManager.showView('add-contact')">
+                        Add Contact Manually
+                    </button>
+                    <button class="btn btn--outline" onclick="contactManager.retryOCR()">
+                        Try OCR Again
+                    </button>
+                    <button class="btn btn--outline" onclick="contactManager.showManualExtraction()">
+                        Extract Text Manually
+                    </button>
+                </div>
             `;
 
             const scanResults = document.getElementById('scan-results');
@@ -1220,7 +1246,140 @@ class ContactManager {
                 scanResults.appendChild(fallbackMessage);
                 scanResults.classList.remove('hidden');
             }
+
+            // Store the file for retry
+            this.lastUploadedFile = file;
         }
+    }
+
+    async retryOCR() {
+        if (this.lastUploadedFile) {
+            // Clear scan results
+            const scanResults = document.getElementById('scan-results');
+            if (scanResults) {
+                scanResults.classList.add('hidden');
+            }
+
+            // Retry with the stored file
+            this.showLoading('Retrying OCR processing...');
+            this.handleCardUpload(this.lastUploadedFile);
+        }
+    }
+
+    showManualExtraction() {
+        if (this.lastUploadedFile) {
+            const imageUrl = URL.createObjectURL(this.lastUploadedFile);
+            const scanResults = document.getElementById('scan-results');
+            if (scanResults) {
+                scanResults.innerHTML = `
+                    <div class="manual-extraction">
+                        <div class="extraction-image">
+                            <img src="${imageUrl}" alt="Business card" style="max-width: 100%; max-height: 400px; border-radius: 8px; margin-bottom: 16px;">
+                        </div>
+                        <div class="extraction-form">
+                            <h3>Extract Contact Information</h3>
+                            <p>Look at the image above and fill in the contact details:</p>
+                            <div class="form-grid">
+                                <input type="text" id="manual-name" placeholder="Full Name" class="form-control">
+                                <input type="text" id="manual-company" placeholder="Company" class="form-control">
+                                <input type="text" id="manual-title" placeholder="Job Title" class="form-control">
+                                <input type="email" id="manual-email" placeholder="Email" class="form-control">
+                                <input type="tel" id="manual-phone" placeholder="Phone" class="form-control">
+                                <input type="text" id="manual-website" placeholder="Website" class="form-control">
+                            </div>
+                            <div class="extraction-actions">
+                                <button class="btn btn--primary" onclick="contactManager.processManualExtraction()">
+                                    Create Contact
+                                </button>
+                                <button class="btn btn--outline" onclick="contactManager.resetScanInterface()">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                scanResults.classList.remove('hidden');
+            }
+        }
+    }
+
+    processManualExtraction() {
+        const extractedData = {
+            fullName: document.getElementById('manual-name')?.value || '',
+            company: document.getElementById('manual-company')?.value || '',
+            jobTitle: document.getElementById('manual-title')?.value || '',
+            emails: document.getElementById('manual-email')?.value ?
+                [{ email: document.getElementById('manual-email').value, type: 'work' }] : [],
+            phoneNumbers: document.getElementById('manual-phone')?.value ?
+                [{ number: document.getElementById('manual-phone').value, type: 'work' }] : [],
+            website: document.getElementById('manual-website')?.value || ''
+        };
+
+        if (!extractedData.fullName) {
+            this.showToast('Please enter at least a name', 'error');
+            return;
+        }
+
+        const imageUrl = this.lastUploadedFile ? URL.createObjectURL(this.lastUploadedFile) : '';
+        this.displayScanResults(extractedData, imageUrl);
+    }
+
+    async preprocessImage(file) {
+        return new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+
+            img.onload = () => {
+                try {
+                    // Calculate optimal size (max 1200px width for faster processing)
+                    const maxWidth = 1200;
+                    const maxHeight = 1200;
+                    let { width, height } = img;
+
+                    if (width > maxWidth || height > maxHeight) {
+                        const ratio = Math.min(maxWidth / width, maxHeight / height);
+                        width *= ratio;
+                        height *= ratio;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    // Draw and enhance image for better OCR
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Enhance contrast and brightness for better text recognition
+                    const imageData = ctx.getImageData(0, 0, width, height);
+                    const data = imageData.data;
+
+                    for (let i = 0; i < data.length; i += 4) {
+                        // Increase contrast
+                        const factor = 1.2;
+                        data[i] = Math.min(255, data[i] * factor);     // Red
+                        data[i + 1] = Math.min(255, data[i + 1] * factor); // Green
+                        data[i + 2] = Math.min(255, data[i + 2] * factor); // Blue
+                    }
+
+                    ctx.putImageData(imageData, 0, 0);
+
+                    // Convert to blob and create URL
+                    canvas.toBlob((blob) => {
+                        if (blob) {
+                            resolve(URL.createObjectURL(blob));
+                        } else {
+                            reject(new Error('Failed to process image'));
+                        }
+                    }, 'image/jpeg', 0.8);
+
+                } catch (error) {
+                    reject(error);
+                }
+            };
+
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = URL.createObjectURL(file);
+        });
     }
 
     async performOCR(imageUrl) {
@@ -1244,29 +1403,12 @@ class ContactManager {
                 throw new Error('Tesseract.js library not loaded. Please check your internet connection.');
             }
 
-            // Initialize worker with better error handling
-            if (!this.ocrWorker) {
-                if (progressText) {
-                    progressText.textContent = 'Loading OCR engine...';
-                }
-
-                try {
-                    this.ocrWorker = await Tesseract.createWorker('eng', 1, {
-                        workerPath: 'https://unpkg.com/tesseract.js@4/dist/worker.min.js',
-                        langPath: 'https://tessdata.projectnaptha.com/4.0.0',
-                        corePath: 'https://unpkg.com/tesseract.js-core@4/tesseract-core.wasm.js',
-                    });
-                } catch (workerError) {
-                    console.error('Worker creation failed:', workerError);
-                    throw new Error('Failed to initialize OCR engine. This may be due to browser security restrictions.');
-                }
-            }
-
             if (progressText) {
                 progressText.textContent = 'Processing image...';
             }
 
-            const result = await this.ocrWorker.recognize(imageUrl, {
+            // Use Tesseract.recognize directly without workers to avoid cloning issues
+            const result = await Tesseract.recognize(imageUrl, 'eng', {
                 logger: (m) => {
                     if (m.status === 'recognizing text' && progressBar && progressText) {
                         const progress = Math.round(m.progress * 100);
@@ -1295,13 +1437,13 @@ class ContactManager {
             }
 
             // Provide user-friendly error messages
-            let errorMessage = 'Failed to process image';
-            if (error.message.includes('Worker')) {
-                errorMessage = 'OCR engine failed to start. Please try refreshing the page.';
-            } else if (error.message.includes('network') || error.message.includes('fetch')) {
-                errorMessage = 'Network error. Please check your internet connection.';
-            } else if (error.message.includes('security') || error.message.includes('blocked')) {
-                errorMessage = 'Browser security settings are blocking OCR. Try using a different browser or disable strict security settings.';
+            let errorMessage = 'OCR processing failed';
+            if (error.message.includes('network') || error.message.includes('fetch')) {
+                errorMessage = 'Network error. Please check your internet connection and try again.';
+            } else if (error.message.includes('cloned') || error.message.includes('Worker')) {
+                errorMessage = 'OCR engine compatibility issue. This may work better in a different browser.';
+            } else if (error.message.includes('timeout')) {
+                errorMessage = 'OCR processing took too long. Try with a smaller or clearer image.';
             }
 
             throw new Error(errorMessage);
