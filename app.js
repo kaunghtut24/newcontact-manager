@@ -1771,7 +1771,7 @@ class ContactManager {
 
             console.log('🚀 Starting Tesseract.recognize...');
 
-            // Use simple configuration that should work with updated CSP
+            // Configure Tesseract with explicit CDN paths to ensure CSP compliance
             const result = await Tesseract.recognize(imageUrl, 'eng', {
                 logger: (m) => {
                     console.log('📊 OCR Progress:', m);
@@ -1781,7 +1781,11 @@ class ContactManager {
                         progressText.textContent = `Processing image... ${progress}%`;
                         console.log(`📈 Progress: ${progress}%`);
                     }
-                }
+                },
+                // Explicitly use unpkg.com to match our CSP
+                workerPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/worker.min.js',
+                langPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/',
+                corePath: 'https://unpkg.com/tesseract.js@4.1.1/dist/'
             });
             console.log('✅ Tesseract.recognize completed');
 
