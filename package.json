@@ -1,0 +1,36 @@
+{
+  "name": "ai-contact-manager",
+  "version": "1.0.0",
+  "description": "AI-powered contact management system with business card scanning",
+  "main": "index.html",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "./build.sh",
+    "serve": "python3 -m http.server 3000",
+    "serve-node": "npx http-server . -p 3000 -o",
+    "preview": "python3 -m http.server 4173",
+    "deploy": "netlify deploy --prod",
+    "deploy-draft": "netlify deploy"
+  },
+  "keywords": [
+    "contact-manager",
+    "ai",
+    "ocr",
+    "business-cards",
+    "static-site"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/ai-contact-manager.git"
+  },
+  "homepage": "https://your-app-name.netlify.app"
+}

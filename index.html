@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2980b9">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Contact Manager">
+    <title>AI Contact Manager</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <script src="https://unpkg.com/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>AI Contact Manager</h2>
+            </div>
+            <ul class="sidebar-nav">
+                <li><button class="nav-btn active" data-view="dashboard">
+                    <span class="nav-icon">📊</span>Dashboard
+                </button></li>
+                <li><button class="nav-btn" data-view="contacts">
+                    <span class="nav-icon">👥</span>Contacts
+                </button></li>
+                <li><button class="nav-btn" data-view="add-contact">
+                    <span class="nav-icon">👤</span>Add Contact
+                </button></li>
+                <li><button class="nav-btn" data-view="scan-card">
+                    <span class="nav-icon">📷</span>Scan Card
+                </button></li>
+                <li><button class="nav-btn" data-view="import-export">
+                    <span class="nav-icon">📁</span>Import/Export
+                </button></li>
+                <li><button class="nav-btn" data-view="settings">
+                    <span class="nav-icon">⚙️</span>Settings
+                </button></li>
+            </ul>
+        </nav>
+
+        <!-- Mobile Menu Toggle -->
+        <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+            <span class="hamburger-line"></span>
+        </button>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Dashboard View -->
+            <div id="dashboard" class="view active">
+                <div class="view-header">
+                    <h1>Dashboard</h1>
+                    <p>Welcome to your AI-powered contact management system</p>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="card stats-card">
+                        <div class="stats-content">
+                            <h3 id="total-contacts">0</h3>
+                            <p>Total Contacts</p>
+                        </div>
+                        <div class="stats-icon">👥</div>
+                    </div>
+                    <div class="card stats-card">
+                        <div class="stats-content">
+                            <h3 id="recent-scans">0</h3>
+                            <p>Cards Scanned</p>
+                        </div>
+                        <div class="stats-icon">📷</div>
+                    </div>
+                    <div class="card stats-card">
+                        <div class="stats-content">
+                            <h3 id="companies">0</h3>
+                            <p>Companies</p>
+                        </div>
+                        <div class="stats-icon">🏢</div>
+                    </div>
+                </div>
+
+                <div class="recent-contacts-section">
+                    <h2>Recent Contacts</h2>
+                    <div id="recent-contacts" class="contacts-grid"></div>
+                </div>
+
+                <div class="quick-actions">
+                    <h2>Quick Actions</h2>
+                    <div class="action-buttons">
+                        <button class="btn btn--primary" data-action="scan-card">
+                            <span>📷</span>Scan Business Card
+                        </button>
+                        <button class="btn btn--secondary" data-action="add-contact">
+                            <span>👤</span>Add Contact
+                        </button>
+                        <button class="btn btn--outline" data-action="import">
+                            <span>📥</span>Import Contacts
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contacts List View -->
+            <div id="contacts" class="view">
+                <div class="view-header">
+                    <h1>Contacts</h1>
+                    <div class="search-controls">
+                        <input type="text" id="contact-search" class="form-control" placeholder="Search contacts...">
+                        <select id="category-filter" class="form-control">
+                            <option value="">All Categories</option>
+                            <option value="personal">Personal</option>
+                            <option value="business">Business</option>
+                            <option value="professional">Professional</option>
+                        </select>
+                        <button class="btn btn--outline" id="view-toggle">Grid</button>
+                    </div>
+                </div>
+                <div id="contacts-list" class="contacts-grid"></div>
+            </div>
+
+            <!-- Add Contact View -->
+            <div id="add-contact" class="view">
+                <div class="view-header">
+                    <h1>Add Contact</h1>
+                    <p>Enter contact information manually</p>
+                </div>
+                
+                <form id="add-contact-form" class="card">
+                    <div class="card__body">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label">First Name *</label>
+                                <input type="text" name="firstName" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Last Name</label>
+                                <input type="text" name="lastName" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Company</label>
+                                <input type="text" name="company" class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Job Title</label>
+                                <input type="text" name="jobTitle" class="form-control">
+                            </div>
+                        </div>
+
+                        <div id="phone-numbers">
+                            <label class="form-label">Phone Numbers</label>
+                            <div class="phone-entry">
+                                <select class="form-control phone-type">
+                                    <option value="work">Work</option>
+                                    <option value="mobile">Mobile</option>
+                                    <option value="home">Home</option>
+                                </select>
+                                <input type="tel" class="form-control phone-number" placeholder="+1-555-123-4567">
+                                <button type="button" class="btn btn--sm btn--outline add-phone">+</button>
+                            </div>
+                        </div>
+
+                        <div id="email-addresses">
+                            <label class="form-label">Email Addresses</label>
+                            <div class="email-entry">
+                                <select class="form-control email-type">
+                                    <option value="work">Work</option>
+                                    <option value="personal">Personal</option>
+                                </select>
+                                <input type="email" class="form-control email-address" placeholder="contact@example.com">
+                                <button type="button" class="btn btn--sm btn--outline add-email">+</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Website</label>
+                            <input type="url" name="website" class="form-control" placeholder="https://example.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Address</label>
+                            <input type="text" name="street" class="form-control" placeholder="Street Address">
+                            <div class="address-row">
+                                <input type="text" name="city" class="form-control" placeholder="City">
+                                <input type="text" name="state" class="form-control" placeholder="State">
+                                <input type="text" name="zipCode" class="form-control" placeholder="ZIP">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Category</label>
+                            <select name="category" class="form-control">
+                                <option value="personal">Personal</option>
+                                <option value="business">Business</option>
+                                <option value="professional">Professional</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Notes</label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="Additional notes..."></textarea>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn--primary">Save Contact</button>
+                            <button type="button" class="btn btn--outline" id="clear-form">Clear Form</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Scan Card View -->
+            <div id="scan-card" class="view">
+                <div class="view-header">
+                    <h1>Scan Business Card</h1>
+                    <p>Upload a photo of a business card to extract contact information</p>
+                </div>
+
+                <div class="scan-container">
+                    <div class="card">
+                        <div class="card__body">
+                            <div id="upload-area" class="upload-area">
+                                <div class="upload-content">
+                                    <div class="upload-icon">📷</div>
+                                    <h3>Drop your business card here</h3>
+                                    <p>or <span class="upload-link">browse to upload</span></p>
+                                    <p class="upload-hint">Supports JPG, PNG, WebP formats</p>
+                                </div>
+                                <input type="file" id="card-upload" accept="image/*" capture="environment" hidden>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="scan-results" class="scan-results hidden">
+                        <div class="card">
+                            <div class="card__body">
+                                <h3>Extracted Information</h3>
+                                <div id="ocr-progress" class="progress-bar hidden">
+                                    <div class="progress-fill"></div>
+                                    <span class="progress-text">Processing image...</span>
+                                </div>
+                                <div id="extracted-data" class="extracted-data"></div>
+                                <div class="scan-actions">
+                                    <button class="btn btn--primary" id="save-scanned-contact">Save Contact</button>
+                                    <button class="btn btn--outline" id="edit-scanned-contact">Edit Details</button>
+                                    <button class="btn btn--outline" id="scan-another">Scan Another</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Import/Export View -->
+            <div id="import-export" class="view">
+                <div class="view-header">
+                    <h1>Import/Export Contacts</h1>
+                    <p>Manage your contact data with various file formats</p>
+                </div>
+
+                <div class="import-export-grid">
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Import Contacts</h3>
+                            <p>Upload CSV files to import multiple contacts</p>
+                            <div class="import-area">
+                                <input type="file" id="import-file" accept=".csv" hidden>
+                                <button class="btn btn--primary" id="select-import-file">
+                                    <span>📥</span>Select CSV File
+                                </button>
+                            </div>
+                            <div id="import-preview" class="import-preview hidden"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Export Contacts</h3>
+                            <p>Download your contacts in various formats</p>
+                            <div class="export-options">
+                                <div class="form-group">
+                                    <label class="form-label">Export Format</label>
+                                    <select id="export-format" class="form-control">
+                                        <option value="vcard">vCard (.vcf)</option>
+                                        <option value="csv">CSV (.csv)</option>
+                                        <option value="excel">Excel (.xlsx)</option>
+                                    </select>
+                                </div>
+                                <div class="export-actions">
+                                    <button class="btn btn--primary" id="export-all">Export All Contacts</button>
+                                    <button class="btn btn--outline" id="export-selected">Export Selected</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div id="settings" class="view">
+                <div class="view-header">
+                    <h1>Settings</h1>
+                    <p>Configure your contact management preferences</p>
+                </div>
+
+                <div class="settings-grid">
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Theme</h3>
+                            <div class="theme-selector">
+                                <label class="radio-label">
+                                    <input type="radio" name="theme" value="light" checked>
+                                    <span>Light Theme</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="theme" value="dark">
+                                    <span>Dark Theme</span>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="theme" value="auto">
+                                    <span>Auto (System)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Data Management</h3>
+                            <div class="data-actions">
+                                <button class="btn btn--outline" id="clear-all-data">Clear All Data</button>
+                                <button class="btn btn--outline" id="export-backup">Create Backup</button>
+                                <button class="btn btn--outline" id="import-backup">Restore Backup</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobile-overlay"></div>
+
+    <!-- Contact Detail Modal -->
+    <div id="contact-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-contact-name">Contact Details</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-contact-details">
+                <!-- Contact details will be populated here -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--primary" id="edit-contact">Edit</button>
+                <button class="btn btn--outline" id="share-contact">Share</button>
+                <button class="btn btn--outline" id="delete-contact">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading" class="loading-overlay hidden">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>Processing...</p>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

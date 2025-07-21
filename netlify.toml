@@ -1,0 +1,42 @@
+[build]
+  # Build command (not needed for static sites, but can be used for preprocessing)
+  command = "echo 'Building static site...'"
+  
+  # Directory to publish (current directory since files are in root)
+  publish = "."
+
+[build.environment]
+  # Node.js version for any build processes
+  NODE_VERSION = "18"
+
+[[redirects]]
+  # Handle client-side routing - redirect all routes to index.html
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  # Security headers for all pages
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self';"
+
+[[headers]]
+  # Cache static assets
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
