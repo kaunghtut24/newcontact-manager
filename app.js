@@ -29,6 +29,7 @@ class ContactManager {
         await this.loadContacts();
         this.loadLLMConfig(); // Load LLM configuration from storage
         this.initEventListeners();
+        this.initMobileOptimizations(); // Add mobile-specific optimizations
         this.initTheme();
         this.showView('dashboard');
         this.updateDashboard();
@@ -383,6 +384,127 @@ class ContactManager {
         document.getElementById('disable-llm').addEventListener('click', () => {
             this.disableLLM();
         });
+    }
+
+    initMobileOptimizations() {
+        console.log('📱 Initializing mobile optimizations...');
+
+        // Detect if we're on a touch device
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        if (isTouchDevice) {
+            console.log('📱 Touch device detected, applying mobile optimizations');
+            document.body.classList.add('touch-device');
+
+            // Add enhanced touch event handling
+            this.addTouchEventHandlers();
+
+            // Improve scroll behavior
+            this.optimizeScrolling();
+
+            // Add mobile-specific gesture handling
+            this.enhanceMobileGestures();
+
+            // Fix viewport issues
+            this.fixMobileViewport();
+        }
+    }
+
+    addTouchEventHandlers() {
+        // Add touch event listeners to all interactive elements
+        const interactiveElements = document.querySelectorAll('.btn, .nav-btn, .contact-card, .upload-area, [role="button"]');
+
+        interactiveElements.forEach(element => {
+            // Add touch feedback
+            element.addEventListener('touchstart', (e) => {
+                element.classList.add('touch-active');
+            }, { passive: true });
+
+            element.addEventListener('touchend', (e) => {
+                setTimeout(() => {
+                    element.classList.remove('touch-active');
+                }, 150);
+            }, { passive: true });
+
+            element.addEventListener('touchcancel', (e) => {
+                element.classList.remove('touch-active');
+            }, { passive: true });
+        });
+    }
+
+    optimizeScrolling() {
+        // Improve scrolling performance on mobile
+        const scrollableElements = document.querySelectorAll('.main-content, .sidebar, .contact-list');
+
+        scrollableElements.forEach(element => {
+            element.style.webkitOverflowScrolling = 'touch';
+            element.style.overflowScrolling = 'touch';
+        });
+    }
+
+    enhanceMobileGestures() {
+        // Enhanced swipe gestures for mobile
+        let startX, startY, startTime;
+
+        document.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+            startTime = Date.now();
+        }, { passive: true });
+
+        document.addEventListener('touchend', (e) => {
+            if (!startX || !startY) return;
+
+            const touch = e.changedTouches[0];
+            const endX = touch.clientX;
+            const endY = touch.clientY;
+            const endTime = Date.now();
+
+            const deltaX = endX - startX;
+            const deltaY = endY - startY;
+            const deltaTime = endTime - startTime;
+
+            // Only process quick swipes
+            if (deltaTime > 300) return;
+
+            // Only process significant swipes
+            if (Math.abs(deltaX) < 50 && Math.abs(deltaY) < 50) return;
+
+            // Horizontal swipes for navigation
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (deltaX > 50) {
+                    // Swipe right - open sidebar
+                    this.toggleMobileMenu();
+                } else if (deltaX < -50) {
+                    // Swipe left - close sidebar
+                    this.closeMobileMenu();
+                }
+            }
+
+            // Reset
+            startX = startY = null;
+        }, { passive: true });
+    }
+
+    fixMobileViewport() {
+        // Fix viewport issues on mobile
+        const viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) {
+            viewport.setAttribute('content',
+                'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
+            );
+        }
+
+        // Prevent zoom on double tap
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
     }
 
     // Mobile Navigation
