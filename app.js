@@ -1546,6 +1546,9 @@ class ContactManager {
     }
 
     parseOCRText(ocrText) {
+        console.log('📝 Starting advanced OCR text parsing...');
+        console.log('Raw OCR text:', ocrText);
+
         const extractedData = {
             firstName: '',
             lastName: '',
@@ -1554,63 +1557,303 @@ class ContactManager {
             phoneNumbers: [],
             emails: [],
             website: '',
+            notes: '',
             address: { street: '', city: '', state: '', zipCode: '' }
         };
 
-        const lines = ocrText.split('\n').filter(line => line.trim());
+        const lines = ocrText.split('\n').filter(line => line.trim()).map(line => line.trim());
+        console.log('Cleaned lines:', lines);
 
-        // Extract email
-        const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
-        const emails = ocrText.match(emailRegex);
+        // Advanced regex patterns
+        const patterns = {
+            email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/gi,
+            phone: /(?:\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})/g,
+            website: /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}/gi,
+            zipCode: /\b\d{5}(?:-\d{4})?\b/g,
+            // Job title indicators
+            jobTitleKeywords: /\b(CEO|CTO|CFO|COO|President|Vice President|VP|Director|Manager|Senior|Lead|Head|Chief|Executive|Officer|Coordinator|Specialist|Analyst|Developer|Engineer|Designer|Consultant|Sales|Marketing|HR|Human Resources|Operations|Finance|Legal|IT|Technology|Product|Project)\b/gi,
+            // Company indicators
+            companyKeywords: /\b(Inc|LLC|Corp|Corporation|Company|Co\.|Ltd|Limited|Group|Associates|Partners|Enterprises|Solutions|Services|Systems|Technologies|Tech|Consulting|International|Global|Holdings|Industries|Agency|Studio|Firm|Organization|Institute|Foundation)\b/gi,
+            // Name patterns (capitalized words, typically 2-4 words)
+            namePattern: /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$/,
+            // Address patterns
+            addressPattern: /\b\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Place|Pl)\b/gi,
+            // City, State patterns
+            cityStatePattern: /([A-Za-z\s]+),\s*([A-Z]{2})\s*\d{5}/g
+        };
+
+        // Extract structured data
+        this._extractEmails(ocrText, extractedData, patterns);
+        this._extractPhones(ocrText, extractedData, patterns);
+        this._extractWebsites(ocrText, extractedData, patterns);
+        this._extractAddress(ocrText, lines, extractedData, patterns);
+        this._extractNameCompanyTitle(lines, extractedData, patterns);
+
+        console.log('📊 Parsed data:', extractedData);
+        return extractedData;
+    }
+
+    _extractEmails(text, data, patterns) {
+        const emails = text.match(patterns.email);
         if (emails) {
-            extractedData.emails.push({ type: 'work', email: emails[0] });
+            emails.forEach(email => {
+                data.emails.push({ type: 'work', email: email.toLowerCase() });
+            });
+            console.log('📧 Found emails:', emails);
         }
+    }
 
-        // Extract phone
-        const phoneRegex = /\+?1?[-\s\.]?\(?[0-9]{3}\)?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4}/g;
-        const phones = ocrText.match(phoneRegex);
+    _extractPhones(text, data, patterns) {
+        const phones = text.match(patterns.phone);
         if (phones) {
-            extractedData.phoneNumbers.push({ type: 'work', number: phones[0] });
+            phones.forEach(phone => {
+                // Clean and format phone number
+                const cleaned = phone.replace(/\D/g, '');
+                if (cleaned.length === 10) {
+                    const formatted = `(${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+                    data.phoneNumbers.push({ type: 'work', number: formatted });
+                } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+                    const formatted = `+1 (${cleaned.slice(1,4)}) ${cleaned.slice(4,7)}-${cleaned.slice(7)}`;
+                    data.phoneNumbers.push({ type: 'work', number: formatted });
+                } else {
+                    data.phoneNumbers.push({ type: 'work', number: phone });
+                }
+            });
+            console.log('📞 Found phones:', phones);
         }
+    }
 
-        // Extract website
-        const websiteRegex = /(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}/g;
-        const websites = ocrText.match(websiteRegex);
+    _extractWebsites(text, data, patterns) {
+        const websites = text.match(patterns.website);
         if (websites) {
-            extractedData.website = websites[0].startsWith('http') ? websites[0] : 'https://' + websites[0];
+            let website = websites[0].toLowerCase();
+            if (!website.startsWith('http')) {
+                website = 'https://' + website;
+            }
+            data.website = website;
+            console.log('🌐 Found website:', website);
         }
+    }
 
-        // Extract ZIP code and address info
-        const zipRegex = /\b\d{5}(?:-\d{4})?\b/g;
-        const zips = ocrText.match(zipRegex);
+    _extractAddress(text, lines, data, patterns) {
+        // Extract ZIP code
+        const zips = text.match(patterns.zipCode);
         if (zips) {
-            extractedData.address.zipCode = zips[0];
+            data.address.zipCode = zips[0];
         }
 
-        // Simple name extraction (first two lines that don't contain special characters)
-        const nameLines = lines.filter(line => 
-            !emailRegex.test(line) && 
-            !phoneRegex.test(line) && 
-            !websiteRegex.test(line) &&
-            line.length < 50 &&
-            !/[0-9]/.test(line)
+        // Extract city, state
+        const cityStateMatch = text.match(patterns.cityStatePattern);
+        if (cityStateMatch) {
+            const match = cityStateMatch[0];
+            const parts = match.split(',');
+            if (parts.length >= 2) {
+                data.address.city = parts[0].trim();
+                const stateZip = parts[1].trim().split(/\s+/);
+                data.address.state = stateZip[0];
+            }
+        }
+
+        // Extract street address
+        const addresses = text.match(patterns.addressPattern);
+        if (addresses) {
+            data.address.street = addresses[0];
+        }
+
+        console.log('🏠 Found address components:', data.address);
+    }
+
+    _extractNameCompanyTitle(lines, data, patterns) {
+        console.log('👤 Analyzing lines for name, company, and title...');
+
+        // Score each line based on what it might be
+        const lineAnalysis = lines.map(line => {
+            const analysis = {
+                text: line,
+                isEmail: patterns.email.test(line),
+                isPhone: patterns.phone.test(line),
+                isWebsite: patterns.website.test(line),
+                isAddress: patterns.addressPattern.test(line),
+                hasJobKeywords: patterns.jobTitleKeywords.test(line),
+                hasCompanyKeywords: patterns.companyKeywords.test(line),
+                isNameLike: patterns.namePattern.test(line),
+                wordCount: line.split(/\s+/).length,
+                hasNumbers: /\d/.test(line),
+                isAllCaps: line === line.toUpperCase() && line.length > 2,
+                length: line.length
+            };
+
+            // Calculate scores
+            analysis.nameScore = this._calculateNameScore(analysis);
+            analysis.titleScore = this._calculateTitleScore(analysis);
+            analysis.companyScore = this._calculateCompanyScore(analysis);
+
+            return analysis;
+        });
+
+        console.log('📊 Line analysis:', lineAnalysis);
+
+        // Filter out obvious non-name/title/company lines
+        const candidates = lineAnalysis.filter(analysis =>
+            !analysis.isEmail &&
+            !analysis.isPhone &&
+            !analysis.isWebsite &&
+            !analysis.isAddress &&
+            analysis.length > 1 &&
+            analysis.length < 100
         );
 
-        if (nameLines.length > 0) {
-            const nameParts = nameLines[0].trim().split(' ');
-            extractedData.firstName = nameParts[0] || '';
-            extractedData.lastName = nameParts.slice(1).join(' ') || '';
+        // Extract name (highest name score)
+        const nameCandidate = candidates
+            .filter(c => c.nameScore > 0)
+            .sort((a, b) => b.nameScore - a.nameScore)[0];
+
+        if (nameCandidate) {
+            const nameParts = nameCandidate.text.split(/\s+/).filter(part =>
+                part.length > 1 && /^[A-Za-z]/.test(part)
+            );
+
+            if (nameParts.length >= 2) {
+                data.firstName = nameParts[0];
+                data.lastName = nameParts.slice(1).join(' ');
+            } else if (nameParts.length === 1) {
+                data.firstName = nameParts[0];
+            }
+            console.log('👤 Extracted name:', { firstName: data.firstName, lastName: data.lastName });
         }
 
-        if (nameLines.length > 1) {
-            extractedData.jobTitle = nameLines[1].trim();
+        // Extract job title (highest title score, excluding name)
+        const titleCandidate = candidates
+            .filter(c => c !== nameCandidate && c.titleScore > 0)
+            .sort((a, b) => b.titleScore - a.titleScore)[0];
+
+        if (titleCandidate) {
+            data.jobTitle = titleCandidate.text;
+            console.log('💼 Extracted job title:', data.jobTitle);
         }
 
-        if (nameLines.length > 2) {
-            extractedData.company = nameLines[2].trim();
+        // Extract company (highest company score, excluding name and title)
+        const companyCandidate = candidates
+            .filter(c => c !== nameCandidate && c !== titleCandidate && c.companyScore > 0)
+            .sort((a, b) => b.companyScore - a.companyScore)[0];
+
+        if (companyCandidate) {
+            data.company = companyCandidate.text;
+            console.log('🏢 Extracted company:', data.company);
         }
 
-        return extractedData;
+        // If we still don't have good matches, use fallback logic
+        this._fallbackExtraction(candidates, data, nameCandidate, titleCandidate, companyCandidate);
+    }
+
+    _calculateNameScore(analysis) {
+        let score = 0;
+
+        // Positive indicators for names
+        if (analysis.isNameLike) score += 50;
+        if (analysis.wordCount >= 2 && analysis.wordCount <= 4) score += 30;
+        if (!analysis.hasNumbers) score += 20;
+        if (!analysis.isAllCaps) score += 15;
+        if (analysis.length >= 5 && analysis.length <= 30) score += 10;
+
+        // Negative indicators
+        if (analysis.hasJobKeywords) score -= 30;
+        if (analysis.hasCompanyKeywords) score -= 40;
+        if (analysis.wordCount > 5) score -= 20;
+        if (analysis.hasNumbers) score -= 25;
+
+        return Math.max(0, score);
+    }
+
+    _calculateTitleScore(analysis) {
+        let score = 0;
+
+        // Positive indicators for job titles
+        if (analysis.hasJobKeywords) score += 60;
+        if (analysis.wordCount >= 2 && analysis.wordCount <= 6) score += 20;
+        if (!analysis.hasNumbers) score += 15;
+        if (analysis.length >= 5 && analysis.length <= 50) score += 10;
+
+        // Common title patterns
+        if (/\b(Manager|Director|Senior|Lead|Head|Chief|Vice|Assistant|Associate)\b/i.test(analysis.text)) score += 30;
+
+        // Negative indicators
+        if (analysis.isNameLike && analysis.wordCount <= 3) score -= 40;
+        if (analysis.hasCompanyKeywords) score -= 20;
+        if (analysis.isAllCaps && analysis.length > 20) score -= 15;
+
+        return Math.max(0, score);
+    }
+
+    _calculateCompanyScore(analysis) {
+        let score = 0;
+
+        // Positive indicators for company names
+        if (analysis.hasCompanyKeywords) score += 50;
+        if (analysis.wordCount >= 2 && analysis.wordCount <= 8) score += 20;
+        if (analysis.length >= 5 && analysis.length <= 60) score += 10;
+        if (analysis.isAllCaps) score += 15;
+
+        // Common company patterns
+        if (/\b(Solutions|Services|Systems|Technologies|Consulting|International|Global)\b/i.test(analysis.text)) score += 25;
+
+        // Negative indicators
+        if (analysis.isNameLike && analysis.wordCount <= 3) score -= 30;
+        if (analysis.hasJobKeywords) score -= 25;
+        if (analysis.hasNumbers && !/\b(Inc|LLC|Corp)\b/i.test(analysis.text)) score -= 15;
+
+        return Math.max(0, score);
+    }
+
+    _fallbackExtraction(candidates, data, nameCandidate, titleCandidate, companyCandidate) {
+        console.log('🔄 Using fallback extraction logic...');
+
+        // If no name found, try first reasonable line
+        if (!data.firstName && candidates.length > 0) {
+            const firstCandidate = candidates.find(c =>
+                c.wordCount >= 2 &&
+                c.wordCount <= 4 &&
+                !c.hasNumbers &&
+                c.length <= 40
+            );
+
+            if (firstCandidate) {
+                const parts = firstCandidate.text.split(/\s+/);
+                data.firstName = parts[0];
+                data.lastName = parts.slice(1).join(' ');
+                console.log('🔄 Fallback name extraction:', { firstName: data.firstName, lastName: data.lastName });
+            }
+        }
+
+        // If no title found, look for lines with professional keywords
+        if (!data.jobTitle && candidates.length > 1) {
+            const titleFallback = candidates.find(c =>
+                c !== nameCandidate &&
+                (c.hasJobKeywords || /\b(Manager|Director|Coordinator|Specialist|Analyst)\b/i.test(c.text)) &&
+                c.length <= 50
+            );
+
+            if (titleFallback) {
+                data.jobTitle = titleFallback.text;
+                console.log('🔄 Fallback title extraction:', data.jobTitle);
+            }
+        }
+
+        // If no company found, look for remaining substantial lines
+        if (!data.company && candidates.length > 2) {
+            const companyFallback = candidates.find(c =>
+                c !== nameCandidate &&
+                c !== titleCandidate &&
+                c.wordCount >= 2 &&
+                c.length >= 5 &&
+                !c.hasJobKeywords
+            );
+
+            if (companyFallback) {
+                data.company = companyFallback.text;
+                console.log('🔄 Fallback company extraction:', data.company);
+            }
+        }
     }
 
     displayScanResults(extractedData, imageUrl) {
