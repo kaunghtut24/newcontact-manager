@@ -14,14 +14,45 @@ class ContactManager {
         // LLM Configuration for OCR validation
         this.llmConfig = {
             enabled: false, // Will be enabled when API key is provided
-            apiKey: '',
-            baseURL: 'https://api.openai.com/v1', // Can be changed to other OpenAI-compatible endpoints
-            model: 'gpt-3.5-turbo', // Cost-effective model
-            maxTokens: 500,
-            temperature: 0.1 // Low temperature for consistent, factual responses
+            apiKey: this.getEnvVariable('LLM_API_KEY') || '', // Try environment variable first
+            baseURL: this.getEnvVariable('LLM_BASE_URL') || 'https://api.openai.com/v1', // Can be changed to other OpenAI-compatible endpoints
+            model: this.getEnvVariable('LLM_MODEL') || 'gpt-3.5-turbo', // Cost-effective model
+            customModel: '', // For custom model names
+            maxTokens: parseInt(this.getEnvVariable('LLM_MAX_TOKENS')) || 500,
+            temperature: parseFloat(this.getEnvVariable('LLM_TEMPERATURE')) || 0.1 // Low temperature for consistent, factual responses
         };
 
+        // Enable LLM if environment variables are set
+        if (this.llmConfig.apiKey) {
+            this.llmConfig.enabled = true;
+            console.log('🤖 LLM enabled via environment variables');
+        }
+
         this.init();
+    }
+
+    // Environment variable helper (works with build tools like Vite, Webpack, etc.)
+    getEnvVariable(name) {
+        // Try different environment variable patterns
+        if (typeof process !== 'undefined' && process.env) {
+            return process.env[name] || process.env[`VITE_${name}`] || process.env[`REACT_APP_${name}`];
+        }
+
+        // Try window environment variables (set by build tools)
+        if (typeof window !== 'undefined' && window.env) {
+            return window.env[name];
+        }
+
+        // Try Vite environment variables (safer check)
+        try {
+            if (typeof window !== 'undefined' && window.__VITE_ENV__) {
+                return window.__VITE_ENV__[name];
+            }
+        } catch (e) {
+            // Ignore errors
+        }
+
+        return null;
     }
 
     async init() {
@@ -405,6 +436,9 @@ class ContactManager {
             // Add mobile-specific gesture handling
             this.enhanceMobileGestures();
 
+            // Add global touch event delegation
+            this.addGlobalTouchDelegation();
+
             // Fix viewport issues
             this.fixMobileViewport();
         }
@@ -412,24 +446,89 @@ class ContactManager {
 
     addTouchEventHandlers() {
         // Add touch event listeners to all interactive elements
-        const interactiveElements = document.querySelectorAll('.btn, .nav-btn, .contact-card, .upload-area, [role="button"]');
+        const selectors = [
+            '.btn', '.nav-btn', '.contact-card', '.upload-area',
+            '[role="button"]', 'button', '.action-btn', '.quick-action',
+            '.modal-close', '.camera-btn', '.scan-actions button',
+            '.contact-actions button', '.form-actions button',
+            '.data-actions button', '.llm-actions button',
+            '.contact-header', '.contact-info', '.contact-avatar'
+        ];
+
+        const interactiveElements = document.querySelectorAll(selectors.join(', '));
+
+        console.log(`📱 Adding touch handlers to ${interactiveElements.length} elements`);
 
         interactiveElements.forEach(element => {
+            // Skip if already has touch handlers
+            if (element.hasAttribute('data-touch-enabled')) {
+                return;
+            }
+
+            // Mark as touch-enabled
+            element.setAttribute('data-touch-enabled', 'true');
+
             // Add touch feedback
-            element.addEventListener('touchstart', (e) => {
+            element.addEventListener('touchstart', () => {
                 element.classList.add('touch-active');
             }, { passive: true });
 
-            element.addEventListener('touchend', (e) => {
+            element.addEventListener('touchend', () => {
                 setTimeout(() => {
                     element.classList.remove('touch-active');
                 }, 150);
             }, { passive: true });
 
-            element.addEventListener('touchcancel', (e) => {
+            element.addEventListener('touchcancel', () => {
                 element.classList.remove('touch-active');
             }, { passive: true });
         });
+    }
+
+    refreshTouchHandlers() {
+        // Re-apply touch handlers to new elements (called when views change)
+        if (document.body.classList.contains('touch-device')) {
+            console.log('📱 Refreshing touch handlers for new elements');
+            this.addTouchEventHandlers();
+        }
+    }
+
+    addGlobalTouchDelegation() {
+        // Global touch event delegation to catch all interactive elements
+        console.log('📱 Adding global touch event delegation');
+
+        const interactiveSelectors = [
+            'button', '.btn', '.nav-btn', '.contact-card', '.upload-area',
+            '.action-btn', '.quick-action', '.modal-close', '.camera-btn',
+            '[role="button"]', '[data-action]', '.scan-actions button',
+            '.contact-actions button', '.form-actions button',
+            '.data-actions button', '.llm-actions button'
+        ];
+
+        // Use event delegation on document body
+        document.body.addEventListener('touchstart', (e) => {
+            const target = e.target.closest(interactiveSelectors.join(', '));
+            if (target && !target.hasAttribute('data-touch-delegated')) {
+                target.classList.add('touch-active');
+                target.setAttribute('data-touch-delegated', 'true');
+            }
+        }, { passive: true });
+
+        document.body.addEventListener('touchend', (e) => {
+            const target = e.target.closest(interactiveSelectors.join(', '));
+            if (target) {
+                setTimeout(() => {
+                    target.classList.remove('touch-active');
+                }, 150);
+            }
+        }, { passive: true });
+
+        document.body.addEventListener('touchcancel', (e) => {
+            const target = e.target.closest(interactiveSelectors.join(', '));
+            if (target) {
+                target.classList.remove('touch-active');
+            }
+        }, { passive: true });
     }
 
     optimizeScrolling() {
@@ -761,6 +860,11 @@ class ContactManager {
 
         this.currentView = viewName;
 
+        // Refresh touch handlers for new view elements
+        setTimeout(() => {
+            this.refreshTouchHandlers();
+        }, 100);
+
         // Special handling for settings view
         if (viewName === 'settings') {
             setTimeout(() => this.populateLLMForm(), 100);
@@ -845,6 +949,9 @@ class ContactManager {
         recentContacts.forEach(contact => {
             container.appendChild(this.createContactCard(contact));
         });
+
+        // Refresh touch handlers for recent contact cards
+        this.refreshTouchHandlers();
     }
 
     // Contact Management with Improved Filtering
@@ -951,6 +1058,9 @@ class ContactManager {
         this.filteredContacts.forEach(contact => {
             container.appendChild(this.createContactCard(contact));
         });
+
+        // Refresh touch handlers for new contact cards
+        this.refreshTouchHandlers();
     }
 
     createContactCard(contact) {
@@ -2385,6 +2495,9 @@ Important:
         }
 
         console.log('✅ Scan button listeners attached');
+
+        // Refresh touch handlers for scan buttons
+        this.refreshTouchHandlers();
     }
 
     // Test function that can be called from browser console
@@ -2742,6 +2855,10 @@ Important:
             this.llmConfig.model = config.model;
         }
 
+        if (config.customModel !== undefined) {
+            this.llmConfig.customModel = config.customModel;
+        }
+
         if (config.maxTokens) {
             this.llmConfig.maxTokens = config.maxTokens;
         }
@@ -2750,13 +2867,19 @@ Important:
             this.llmConfig.temperature = config.temperature;
         }
 
-        // Save to localStorage
-        localStorage.setItem('llmConfig', JSON.stringify(this.llmConfig));
+        // Save to localStorage (exclude sensitive data in production)
+        const configToSave = { ...this.llmConfig };
+        if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            // In production, don't save API key to localStorage for security
+            configToSave.apiKey = configToSave.apiKey ? '***CONFIGURED***' : '';
+        }
+        localStorage.setItem('llmConfig', JSON.stringify(configToSave));
 
         console.log('✅ LLM configuration updated:', {
             enabled: this.llmConfig.enabled,
             baseURL: this.llmConfig.baseURL,
             model: this.llmConfig.model,
+            customModel: this.llmConfig.customModel,
             hasApiKey: !!this.llmConfig.apiKey
         });
 
@@ -2826,17 +2949,29 @@ Important:
     saveLLMConfig() {
         const apiKey = document.getElementById('llm-api-key').value.trim();
         const baseURL = document.getElementById('llm-base-url').value.trim() || 'https://api.openai.com/v1';
-        const model = document.getElementById('llm-model').value;
+        const selectedModel = document.getElementById('llm-model').value;
+        const customModel = document.getElementById('llm-custom-model').value.trim();
 
         if (!apiKey) {
             this.showToast('Please enter an API key', 'error');
             return;
         }
 
+        // Determine the actual model to use
+        let model = selectedModel;
+        if (selectedModel === 'custom') {
+            if (!customModel) {
+                this.showToast('Please enter a custom model name', 'error');
+                return;
+            }
+            model = customModel;
+        }
+
         this.configureLLM({
             apiKey,
             baseURL,
-            model
+            model,
+            customModel: selectedModel === 'custom' ? customModel : ''
         });
 
         this.showToast('LLM configuration saved successfully', 'success');
@@ -2873,9 +3008,49 @@ Important:
     }
 
     populateLLMForm() {
-        document.getElementById('llm-api-key').value = this.llmConfig.apiKey ? '••••••••••••••••' : '';
-        document.getElementById('llm-base-url').value = this.llmConfig.baseURL;
-        document.getElementById('llm-model').value = this.llmConfig.model;
+        // Handle API key display
+        const apiKeyInput = document.getElementById('llm-api-key');
+        if (apiKeyInput) {
+            apiKeyInput.value = this.llmConfig.apiKey && this.llmConfig.apiKey !== '***CONFIGURED***' ? '••••••••••••••••' : '';
+        }
+
+        // Set base URL
+        const baseUrlInput = document.getElementById('llm-base-url');
+        if (baseUrlInput) {
+            baseUrlInput.value = this.llmConfig.baseURL;
+        }
+
+        // Handle model selection
+        const modelSelect = document.getElementById('llm-model');
+        const customModelInput = document.getElementById('llm-custom-model');
+        const customModelGroup = document.getElementById('custom-model-group');
+
+        if (modelSelect && customModelInput && customModelGroup) {
+            // Check if current model is in the predefined list
+            const predefinedModels = Array.from(modelSelect.options).map(option => option.value);
+
+            if (predefinedModels.includes(this.llmConfig.model)) {
+                modelSelect.value = this.llmConfig.model;
+                customModelGroup.style.display = 'none';
+            } else {
+                // Custom model
+                modelSelect.value = 'custom';
+                customModelInput.value = this.llmConfig.model;
+                customModelGroup.style.display = 'block';
+            }
+        }
+
+        // Add event listener for model selection change
+        if (modelSelect) {
+            modelSelect.addEventListener('change', (e) => {
+                if (e.target.value === 'custom') {
+                    customModelGroup.style.display = 'block';
+                    customModelInput.focus();
+                } else {
+                    customModelGroup.style.display = 'none';
+                }
+            });
+        }
     }
 
     // Import backup function (was missing)

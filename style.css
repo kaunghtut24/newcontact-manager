@@ -1660,6 +1660,30 @@ select.form-control {
     transition: all 0.1s ease !important;
   }
 
+  /* Ensure all interactive elements are touch-responsive */
+  button,
+  .btn,
+  .nav-btn,
+  .contact-card,
+  .upload-area,
+  .action-btn,
+  .quick-action,
+  .modal-close,
+  .camera-btn,
+  [role="button"],
+  [data-action],
+  .scan-actions button,
+  .contact-actions button,
+  .form-actions button,
+  .data-actions button,
+  .llm-actions button {
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    cursor: pointer !important;
+  }
+
   /* Add touch feedback for interactive elements */
   .form-control:focus {
     outline: 2px solid var(--color-primary);
@@ -1852,6 +1876,14 @@ select.form-control {
 }
 
 .llm-info small {
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.form-help {
+  display: block;
+  margin-top: var(--space-4);
+  font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
   line-height: 1.4;
 }
