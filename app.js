@@ -1210,17 +1210,36 @@ class ContactManager {
         // Show immediate feedback
         this.showLoading('Preparing image...');
 
-        // Show image preview immediately
+        // Show image preview immediately without destroying the structure
         const imageUrl = URL.createObjectURL(file);
         const scanResults = document.getElementById('scan-results');
         if (scanResults) {
+            // Ensure the complete structure exists
             scanResults.innerHTML = `
-                <div class="image-preview">
-                    <img src="${imageUrl}" alt="Business card preview" style="max-width: 100%; max-height: 300px; border-radius: 8px; margin-bottom: 16px;">
-                    <p>Processing image with OCR...</p>
+                <div class="card">
+                    <div class="card__body">
+                        <h3>Extracted Information</h3>
+                        <div class="image-preview">
+                            <img src="${imageUrl}" alt="Business card preview" style="max-width: 100%; max-height: 300px; border-radius: 8px; margin-bottom: 16px;">
+                            <p>Processing image with OCR...</p>
+                        </div>
+                        <div id="ocr-progress" class="progress-bar hidden">
+                            <div class="progress-fill"></div>
+                            <span class="progress-text">Processing image...</span>
+                        </div>
+                        <div id="extracted-data" class="extracted-data"></div>
+                        <div class="scan-actions">
+                            <button class="btn btn--primary" id="save-scanned-contact">Save Contact</button>
+                            <button class="btn btn--outline" id="edit-scanned-contact">Edit Details</button>
+                            <button class="btn btn--outline" id="scan-another">Scan Another</button>
+                        </div>
+                    </div>
                 </div>
             `;
             scanResults.classList.remove('hidden');
+
+            // Attach event listeners for the buttons
+            this._attachScanButtonListeners();
         }
         
         try {
@@ -1672,44 +1691,39 @@ class ContactManager {
 
             // Try to create the missing container as a last resort
             if (scanResults && !container) {
-                console.log('🛠️ Attempting to create missing extracted-data container...');
+                console.log('🛠️ Attempting to recreate complete scan-results structure...');
 
-                // Create the extracted-data container
-                const newContainer = document.createElement('div');
-                newContainer.id = 'extracted-data';
-                newContainer.className = 'extracted-data';
-
-                // Create the scan-actions container with buttons
-                const scanActions = document.createElement('div');
-                scanActions.className = 'scan-actions';
-                scanActions.innerHTML = `
-                    <button class="btn btn--primary" id="save-scanned-contact">Save Contact</button>
-                    <button class="btn btn--outline" id="edit-scanned-contact">Edit Details</button>
-                    <button class="btn btn--outline" id="scan-another">Scan Another</button>
+                // The scan-results div exists but is empty, so recreate the entire structure
+                scanResults.innerHTML = `
+                    <div class="card">
+                        <div class="card__body">
+                            <h3>Extracted Information</h3>
+                            <div id="ocr-progress" class="progress-bar hidden">
+                                <div class="progress-fill"></div>
+                                <span class="progress-text">Processing image...</span>
+                            </div>
+                            <div id="extracted-data" class="extracted-data"></div>
+                            <div class="scan-actions">
+                                <button class="btn btn--primary" id="save-scanned-contact">Save Contact</button>
+                                <button class="btn btn--outline" id="edit-scanned-contact">Edit Details</button>
+                                <button class="btn btn--outline" id="scan-another">Scan Another</button>
+                            </div>
+                        </div>
+                    </div>
                 `;
 
-                // Find the right place to insert them
-                const cardBody = scanResults.querySelector('.card__body');
-                if (cardBody) {
-                    // Find the progress bar to insert after it
-                    const progressBar = scanResults.querySelector('#ocr-progress');
-                    if (progressBar) {
-                        cardBody.insertBefore(newContainer, progressBar.nextSibling);
-                        cardBody.insertBefore(scanActions, newContainer.nextSibling);
-                    } else {
-                        // Just append to the card body
-                        cardBody.appendChild(newContainer);
-                        cardBody.appendChild(scanActions);
-                    }
+                // Now find the newly created container
+                const newContainer = scanResults.querySelector('#extracted-data');
 
+                if (newContainer) {
                     // Re-attach event listeners for the new buttons
                     this._attachScanButtonListeners();
 
-                    console.log('✅ Created missing container and action buttons, attempting to render...');
+                    console.log('✅ Recreated complete scan-results structure, attempting to render...');
                     this._renderScanResults(scanResults, newContainer, extractedData, imageUrl);
                     return;
                 } else {
-                    console.error('❌ Could not find card body to insert elements');
+                    console.error('❌ Failed to create extracted-data container even after recreating structure');
                 }
             }
 
