@@ -738,14 +738,14 @@ class ContactManager {
 
         this.filteredContacts = filtered;
         
-        // Debug logging
-        console.log('Applied filters:', {
-            searchTerm: this.currentSearchTerm,
-            categoryFilter: this.currentCategoryFilter,
-            totalContacts: this.contacts.length,
-            filteredContacts: this.filteredContacts.length,
-            filteredContactNames: this.filteredContacts.map(c => c.fullName)
-        });
+        // Debug logging (commented out for production)
+        // console.log('Applied filters:', {
+        //     searchTerm: this.currentSearchTerm,
+        //     categoryFilter: this.currentCategoryFilter,
+        //     totalContacts: this.contacts.length,
+        //     filteredContacts: this.filteredContacts.length,
+        //     filteredContactNames: this.filteredContacts.map(c => c.fullName)
+        // });
     }
 
     renderContactsList() {
@@ -1203,6 +1203,13 @@ class ContactManager {
         }
         
         try {
+            // Ensure we're on the scan view
+            if (this.currentView !== 'scan-card') {
+                this.showView('scan-card');
+                // Wait a bit for the view to load
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
             // Preprocess image for faster OCR
             const processedImageUrl = await this.preprocessImage(file);
             const ocrResult = await this.performOCR(processedImageUrl);
@@ -1321,6 +1328,12 @@ class ContactManager {
         }
 
         const imageUrl = this.lastUploadedFile ? URL.createObjectURL(this.lastUploadedFile) : '';
+
+        // Ensure we're on the scan view
+        if (this.currentView !== 'scan-card') {
+            this.showView('scan-card');
+        }
+
         this.displayScanResults(extractedData, imageUrl);
     }
 
@@ -1519,19 +1532,33 @@ class ContactManager {
     }
 
     displayScanResults(extractedData, imageUrl) {
-        document.getElementById('scan-results').classList.remove('hidden');
-        
+        const scanResults = document.getElementById('scan-results');
         const container = document.getElementById('extracted-data');
+
+        if (!scanResults) {
+            console.error('scan-results element not found');
+            this.showToast('Error displaying results', 'error');
+            return;
+        }
+
+        if (!container) {
+            console.error('extracted-data element not found');
+            this.showToast('Error displaying extracted data', 'error');
+            return;
+        }
+
+        scanResults.classList.remove('hidden');
+
         container.innerHTML = `
             <div class="scan-preview">
                 <img src="${imageUrl}" alt="Scanned card" style="max-width: 200px; max-height: 120px; object-fit: contain; border-radius: 8px;">
             </div>
             <div class="extracted-fields">
-                <p><strong>Name:</strong> ${extractedData.firstName} ${extractedData.lastName}</p>
-                <p><strong>Company:</strong> ${extractedData.company}</p>
-                <p><strong>Job Title:</strong> ${extractedData.jobTitle}</p>
-                <p><strong>Email:</strong> ${extractedData.emails[0]?.email || 'Not found'}</p>
-                <p><strong>Phone:</strong> ${extractedData.phoneNumbers[0]?.number || 'Not found'}</p>
+                <p><strong>Name:</strong> ${extractedData.firstName || ''} ${extractedData.lastName || ''}</p>
+                <p><strong>Company:</strong> ${extractedData.company || 'Not found'}</p>
+                <p><strong>Job Title:</strong> ${extractedData.jobTitle || 'Not found'}</p>
+                <p><strong>Email:</strong> ${extractedData.emails && extractedData.emails[0]?.email || 'Not found'}</p>
+                <p><strong>Phone:</strong> ${extractedData.phoneNumbers && extractedData.phoneNumbers[0]?.number || 'Not found'}</p>
                 <p><strong>Website:</strong> ${extractedData.website || 'Not found'}</p>
             </div>
         `;
