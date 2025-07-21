@@ -1668,6 +1668,21 @@ select.form-control {
   margin-top: var(--space-8);
 }
 
+/* Scan fallback styles */
+.scan-fallback {
+  text-align: center;
+  padding: var(--space-24);
+  background: var(--color-surface);
+  border-radius: var(--border-radius-lg);
+  border: 2px dashed var(--color-border);
+  margin: var(--space-16) 0;
+}
+
+.scan-fallback p {
+  margin-bottom: var(--space-16);
+  color: var(--color-text-secondary);
+}
+
 /* Camera Modal Styles */
 .camera-modal {
   position: fixed;

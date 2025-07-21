@@ -38,34 +38,55 @@ function serveFile(filePath, res) {
 
   fs.readFile(filePath, (err, data) => {
     if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('File not found');
+      if (!res.headersSent) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('File not found');
+      }
       return;
     }
 
-    res.writeHead(200, { 
-      'Content-Type': contentType,
-      'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000'
-    });
-    res.end(data);
+    try {
+      if (!res.headersSent) {
+        res.writeHead(200, {
+          'Content-Type': contentType,
+          'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        });
+        res.end(data);
+      }
+    } catch (writeError) {
+      console.log('Client disconnected during response');
+    }
   });
 }
 
 const server = http.createServer((req, res) => {
-  const parsedUrl = url.parse(req.url);
-  let pathname = parsedUrl.pathname;
+  // Handle client disconnections gracefully
+  req.on('close', () => {
+    console.log('Client disconnected');
+  });
 
-  // Remove leading slash
-  if (pathname.startsWith('/')) {
-    pathname = pathname.substring(1);
-  }
+  res.on('error', (err) => {
+    console.log('Response error:', err.message);
+  });
 
-  // Default to index.html for root path
-  if (pathname === '' || pathname === '/') {
-    pathname = 'index.html';
-  }
+  try {
+    const parsedUrl = url.parse(req.url);
+    let pathname = parsedUrl.pathname;
 
-  const filePath = path.join(__dirname, pathname);
+    // Remove leading slash
+    if (pathname.startsWith('/')) {
+      pathname = pathname.substring(1);
+    }
+
+    // Default to index.html for root path
+    if (pathname === '' || pathname === '/') {
+      pathname = 'index.html';
+    }
+
+    const filePath = path.join(__dirname, pathname);
 
   // Check if file exists
   fs.access(filePath, fs.constants.F_OK, (err) => {
@@ -98,7 +119,13 @@ const server = http.createServer((req, res) => {
         }
       });
     }
-  });
+  } catch (error) {
+    console.error('Server error:', error);
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Internal server error');
+    }
+  }
 });
 
 server.listen(PORT, HOST, () => {

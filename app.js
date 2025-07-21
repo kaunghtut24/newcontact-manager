@@ -1198,23 +1198,72 @@ class ContactManager {
             
         } catch (error) {
             console.error('OCR Error:', error);
-            this.showToast('Failed to process image', 'error');
+
+            // Show user-friendly error message with fallback option
+            const errorMessage = error.message || 'Failed to process image';
+            this.showToast(errorMessage + ' You can still add contact details manually.', 'error');
             this.hideLoading();
+
+            // Offer manual entry as fallback
+            const fallbackMessage = document.createElement('div');
+            fallbackMessage.className = 'scan-fallback';
+            fallbackMessage.innerHTML = `
+                <p>OCR processing failed, but you can:</p>
+                <button class="btn btn--primary" onclick="contactManager.showView('add-contact')">
+                    Add Contact Manually
+                </button>
+            `;
+
+            const scanResults = document.getElementById('scan-results');
+            if (scanResults) {
+                scanResults.innerHTML = '';
+                scanResults.appendChild(fallbackMessage);
+                scanResults.classList.remove('hidden');
+            }
         }
     }
 
     async performOCR(imageUrl) {
+        const progressContainer = document.getElementById('ocr-progress');
+        const progressBar = document.querySelector('.progress-fill');
+        const progressText = document.querySelector('.progress-text');
+
         try {
-            if (!this.ocrWorker) {
-                this.ocrWorker = await Tesseract.createWorker('eng');
-            }
-
-            const progressBar = document.querySelector('.progress-fill');
-            const progressText = document.querySelector('.progress-text');
-            const progressContainer = document.getElementById('ocr-progress');
-
+            // Show progress container
             if (progressContainer) {
                 progressContainer.classList.remove('hidden');
+            }
+
+            // Update progress text
+            if (progressText) {
+                progressText.textContent = 'Initializing OCR...';
+            }
+
+            // Check if Tesseract is available
+            if (typeof Tesseract === 'undefined') {
+                throw new Error('Tesseract.js library not loaded. Please check your internet connection.');
+            }
+
+            // Initialize worker with better error handling
+            if (!this.ocrWorker) {
+                if (progressText) {
+                    progressText.textContent = 'Loading OCR engine...';
+                }
+
+                try {
+                    this.ocrWorker = await Tesseract.createWorker('eng', 1, {
+                        workerPath: 'https://unpkg.com/tesseract.js@4/dist/worker.min.js',
+                        langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+                        corePath: 'https://unpkg.com/tesseract.js-core@4/tesseract-core.wasm.js',
+                    });
+                } catch (workerError) {
+                    console.error('Worker creation failed:', workerError);
+                    throw new Error('Failed to initialize OCR engine. This may be due to browser security restrictions.');
+                }
+            }
+
+            if (progressText) {
+                progressText.textContent = 'Processing image...';
             }
 
             const result = await this.ocrWorker.recognize(imageUrl, {
@@ -1230,14 +1279,32 @@ class ContactManager {
             if (progressContainer) {
                 progressContainer.classList.add('hidden');
             }
+
+            if (!result || !result.data || !result.data.text) {
+                throw new Error('No text could be extracted from the image');
+            }
+
             return result.data.text;
+
         } catch (error) {
             console.error('OCR Error:', error);
-            const progressContainer = document.getElementById('ocr-progress');
+
+            // Hide progress container
             if (progressContainer) {
                 progressContainer.classList.add('hidden');
             }
-            throw error;
+
+            // Provide user-friendly error messages
+            let errorMessage = 'Failed to process image';
+            if (error.message.includes('Worker')) {
+                errorMessage = 'OCR engine failed to start. Please try refreshing the page.';
+            } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                errorMessage = 'Network error. Please check your internet connection.';
+            } else if (error.message.includes('security') || error.message.includes('blocked')) {
+                errorMessage = 'Browser security settings are blocking OCR. Try using a different browser or disable strict security settings.';
+            }
+
+            throw new Error(errorMessage);
         }
     }
 
