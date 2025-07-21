@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Simulation Test</title>
+    <script src="https://unpkg.com/tesseract.js@4/dist/tesseract.min.js"></script>
+</head>
+<body>
+    <h1>OCR Simulation Test</h1>
+    <button id="testBtn">Test OCR with Business Card</button>
+    <div id="result"></div>
+    <div id="logs" style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; white-space: pre-wrap;"></div>
+
+    <script>
+        function log(message) {
+            console.log(message);
+            const logs = document.getElementById('logs');
+            logs.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        async function testOCR() {
+            log('🔄 Starting OCR simulation test...');
+            
+            try {
+                // Test with the business card image
+                const imageUrl = './test-card.jpg';
+                log('🖼️ Testing with image: ' + imageUrl);
+
+                log('🔍 Checking Tesseract availability...');
+                if (typeof Tesseract === 'undefined') {
+                    throw new Error('Tesseract.js not loaded');
+                }
+                log('✅ Tesseract.js is available');
+
+                log('🚀 Starting OCR processing...');
+                const startTime = Date.now();
+
+                const result = await Tesseract.recognize(imageUrl, 'eng', {
+                    logger: (m) => {
+                        if (m.status === 'recognizing text') {
+                            const progress = Math.round(m.progress * 100);
+                            log(`📈 Progress: ${progress}%`);
+                        } else if (m.status) {
+                            log(`📊 Status: ${m.status} - ${m.progress ? Math.round(m.progress * 100) + '%' : ''}`);
+                        }
+                    }
+                });
+
+                const endTime = Date.now();
+                const duration = (endTime - startTime) / 1000;
+
+                log('✅ OCR completed successfully!');
+                log(`⏱️ Processing time: ${duration} seconds`);
+                log(`📝 Text length: ${result.data.text.length} characters`);
+                log(`🔤 Confidence: ${result.data.confidence}%`);
+                
+                // Show first 500 characters of extracted text
+                const preview = result.data.text.substring(0, 500);
+                log(`📄 Text preview: "${preview}${result.data.text.length > 500 ? '...' : ''}"`);
+
+                // Display full result
+                document.getElementById('result').innerHTML = `
+                    <h3>OCR Results:</h3>
+                    <p><strong>Processing Time:</strong> ${duration} seconds</p>
+                    <p><strong>Confidence:</strong> ${result.data.confidence}%</p>
+                    <p><strong>Text Length:</strong> ${result.data.text.length} characters</p>
+                    <h4>Extracted Text:</h4>
+                    <pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd;">${result.data.text}</pre>
+                `;
+
+            } catch (error) {
+                log('❌ Error occurred: ' + error.message);
+                log('🔍 Error details: ' + error.stack);
+                
+                document.getElementById('result').innerHTML = `
+                    <h3>Error:</h3>
+                    <p style="color: red;">${error.message}</p>
+                    <pre style="color: red; font-size: 12px;">${error.stack}</pre>
+                `;
+            }
+        }
+
+        document.getElementById('testBtn').addEventListener('click', testOCR);
+
+        // Initial setup
+        log('🔍 Initializing OCR test environment...');
+        log('🌐 User Agent: ' + navigator.userAgent);
+        log('📱 Platform: ' + navigator.platform);
+        
+        if (typeof Tesseract !== 'undefined') {
+            log('✅ Tesseract.js loaded successfully');
+        } else {
+            log('❌ Tesseract.js failed to load');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Test</title>
+    <script src="https://unpkg.com/tesseract.js@4/dist/tesseract.min.js"></script>
+</head>
+<body>
+    <h1>OCR Test</h1>
+    <input type="file" id="fileInput" accept="image/*">
+    <div id="result"></div>
+    <div id="logs"></div>
+
+    <script>
+        function log(message) {
+            console.log(message);
+            const logs = document.getElementById('logs');
+            logs.innerHTML += '<p>' + message + '</p>';
+        }
+
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            log('🔄 Starting OCR test with file: ' + file.name);
+            log('📊 File size: ' + file.size + ' bytes');
+            log('📋 File type: ' + file.type);
+
+            try {
+                const imageUrl = URL.createObjectURL(file);
+                log('🖼️ Image URL created: ' + imageUrl.substring(0, 50) + '...');
+
+                log('🚀 Starting Tesseract.recognize...');
+                const startTime = Date.now();
+
+                const result = await Tesseract.recognize(imageUrl, 'eng', {
+                    logger: (m) => {
+                        if (m.status === 'recognizing text') {
+                            const progress = Math.round(m.progress * 100);
+                            log(`📈 Progress: ${progress}%`);
+                        } else {
+                            log(`📊 Status: ${m.status}`);
+                        }
+                    }
+                });
+
+                const endTime = Date.now();
+                const duration = (endTime - startTime) / 1000;
+
+                log('✅ OCR completed in ' + duration + ' seconds');
+                log('📝 Extracted text length: ' + result.data.text.length);
+                log('📄 Extracted text: ' + result.data.text.substring(0, 200) + '...');
+
+                document.getElementById('result').innerHTML = '<pre>' + result.data.text + '</pre>';
+
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+                log('🔍 Error stack: ' + error.stack);
+            }
+        });
+
+        // Test Tesseract availability
+        log('🔍 Testing Tesseract availability...');
+        if (typeof Tesseract !== 'undefined') {
+            log('✅ Tesseract.js is loaded and available');
+            log('📋 Tesseract version: ' + (Tesseract.version || 'unknown'));
+        } else {
+            log('❌ Tesseract.js is not available');
+        }
+    </script>
+</body>
+</html>

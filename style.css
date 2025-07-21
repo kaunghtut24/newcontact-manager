@@ -1734,6 +1734,59 @@ select.form-control {
   justify-content: center;
 }
 
+/* LLM Configuration Styles */
+.llm-status {
+  font-size: var(--font-size-sm);
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--border-radius-sm);
+  font-weight: 500;
+}
+
+.llm-status.enabled {
+  background: var(--color-success-light);
+  color: var(--color-success-dark);
+}
+
+.llm-status.disabled {
+  background: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.llm-config {
+  margin-top: var(--space-16);
+}
+
+.llm-config .form-group {
+  margin-bottom: var(--space-16);
+}
+
+.llm-config label {
+  display: block;
+  margin-bottom: var(--space-4);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.llm-actions {
+  display: flex;
+  gap: var(--space-12);
+  margin-top: var(--space-20);
+  flex-wrap: wrap;
+}
+
+.llm-info {
+  margin-top: var(--space-12);
+  padding: var(--space-12);
+  background: var(--color-surface);
+  border-radius: var(--border-radius-md);
+  border-left: 3px solid var(--color-primary);
+}
+
+.llm-info small {
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
 @media (max-width: 480px) {
   .fallback-actions {
     flex-direction: column;
@@ -1752,6 +1805,14 @@ select.form-control {
   }
 
   .extraction-actions .btn {
+    width: 100%;
+  }
+
+  .llm-actions {
+    flex-direction: column;
+  }
+
+  .llm-actions .btn {
     width: 100%;
   }
 }

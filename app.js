@@ -9,13 +9,25 @@ class ContactManager {
         this.ocrWorker = null;
         this.currentSearchTerm = '';
         this.currentCategoryFilter = '';
-        
+        this.scannedContactData = null;
+
+        // LLM Configuration for OCR validation
+        this.llmConfig = {
+            enabled: false, // Will be enabled when API key is provided
+            apiKey: '',
+            baseURL: 'https://api.openai.com/v1', // Can be changed to other OpenAI-compatible endpoints
+            model: 'gpt-3.5-turbo', // Cost-effective model
+            maxTokens: 500,
+            temperature: 0.1 // Low temperature for consistent, factual responses
+        };
+
         this.init();
     }
 
     async init() {
         await this.initDB();
         await this.loadContacts();
+        this.loadLLMConfig(); // Load LLM configuration from storage
         this.initEventListeners();
         this.initTheme();
         this.showView('dashboard');
@@ -349,6 +361,28 @@ class ContactManager {
         document.getElementById('export-backup').addEventListener('click', () => {
             this.exportBackup();
         });
+
+        // Import backup
+        document.getElementById('import-backup').addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => this.importBackup(e.target.files[0]);
+            input.click();
+        });
+
+        // LLM Configuration
+        document.getElementById('save-llm-config').addEventListener('click', () => {
+            this.saveLLMConfig();
+        });
+
+        document.getElementById('test-llm-connection').addEventListener('click', () => {
+            this.testLLMConnectionUI();
+        });
+
+        document.getElementById('disable-llm').addEventListener('click', () => {
+            this.disableLLM();
+        });
     }
 
     // Mobile Navigation
@@ -604,6 +638,11 @@ class ContactManager {
         }
 
         this.currentView = viewName;
+
+        // Special handling for settings view
+        if (viewName === 'settings') {
+            setTimeout(() => this.populateLLMForm(), 100);
+        }
 
         // Load view-specific content
         switch (viewName) {
@@ -1278,7 +1317,7 @@ class ContactManager {
             console.log('✅ OCR processing complete, result length:', ocrResult?.length || 0);
 
             console.log('📝 Parsing OCR text...');
-            const extractedData = this.parseOCRText(ocrResult);
+            const extractedData = await this.parseOCRText(ocrResult);
             console.log('✅ Text parsing complete:', extractedData);
 
             console.log('📊 Displaying scan results...');
@@ -1545,7 +1584,7 @@ class ContactManager {
         }
     }
 
-    parseOCRText(ocrText) {
+    async parseOCRText(ocrText) {
         console.log('📝 Starting advanced OCR text parsing...');
         console.log('Raw OCR text:', ocrText);
 
@@ -1590,7 +1629,157 @@ class ContactManager {
         this._extractNameCompanyTitle(lines, extractedData, patterns);
 
         console.log('📊 Parsed data:', extractedData);
+
+        // Add LLM validation layer
+        if (this.llmConfig && this.llmConfig.enabled) {
+            console.log('🤖 Sending to LLM for validation and correction...');
+            try {
+                const llmCorrectedData = await this.validateWithLLM(ocrText, extractedData);
+                console.log('✅ LLM corrected data:', llmCorrectedData);
+                return llmCorrectedData;
+            } catch (error) {
+                console.error('❌ LLM validation failed, using original parsing:', error);
+                return extractedData;
+            }
+        }
+
         return extractedData;
+    }
+
+    async validateWithLLM(ocrText, parsedData) {
+        console.log('🤖 Starting LLM validation...');
+
+        const prompt = this._createValidationPrompt(ocrText, parsedData);
+
+        try {
+            const response = await fetch(`${this.llmConfig.baseURL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.llmConfig.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: this.llmConfig.model,
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'You are an expert at analyzing business card text and extracting contact information. You must respond with valid JSON only, no additional text.'
+                        },
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    max_tokens: this.llmConfig.maxTokens,
+                    temperature: this.llmConfig.temperature
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`LLM API error: ${response.status} ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            const llmResponse = result.choices[0].message.content.trim();
+
+            console.log('🤖 LLM raw response:', llmResponse);
+
+            // Parse the JSON response
+            const correctedData = JSON.parse(llmResponse);
+
+            // Validate the structure
+            const validatedData = this._validateLLMResponse(correctedData, parsedData);
+
+            console.log('✅ LLM validation complete');
+            return validatedData;
+
+        } catch (error) {
+            console.error('❌ LLM validation error:', error);
+            throw error;
+        }
+    }
+
+    _createValidationPrompt(ocrText, parsedData) {
+        return `Please analyze this business card OCR text and correct/improve the extracted contact information.
+
+OCR Text:
+"""
+${ocrText}
+"""
+
+Current Parsed Data:
+"""
+${JSON.stringify(parsedData, null, 2)}
+"""
+
+Instructions:
+1. Review the OCR text and the parsed data
+2. Correct any obvious errors in field assignments
+3. Improve name formatting (proper case, full names)
+4. Ensure job titles are complete and properly formatted
+5. Verify company names are complete and correctly capitalized
+6. Standardize phone number formatting
+7. Ensure email addresses are lowercase
+8. Add https:// to websites if missing
+9. Extract any additional relevant information for the notes field
+
+Please respond with ONLY a JSON object in this exact format:
+{
+    "firstName": "string",
+    "lastName": "string",
+    "company": "string",
+    "jobTitle": "string",
+    "email": "string",
+    "phone": "string",
+    "website": "string",
+    "notes": "string"
+}
+
+Important:
+- Use empty strings for missing information, not null
+- Format phone numbers consistently
+- Use proper capitalization for names and titles
+- Include only the most relevant information
+- Keep notes brief and factual`;
+    }
+
+    _validateLLMResponse(llmData, fallbackData) {
+        console.log('🔍 Validating LLM response structure...');
+
+        const validatedData = {
+            firstName: this._validateString(llmData.firstName, fallbackData.firstName),
+            lastName: this._validateString(llmData.lastName, fallbackData.lastName),
+            company: this._validateString(llmData.company, fallbackData.company),
+            jobTitle: this._validateString(llmData.jobTitle, fallbackData.jobTitle),
+            emails: [],
+            phoneNumbers: [],
+            website: this._validateString(llmData.website, fallbackData.website),
+            notes: this._validateString(llmData.notes, ''),
+            address: fallbackData.address || { street: '', city: '', state: '', zipCode: '' }
+        };
+
+        // Convert single email/phone to array format
+        if (llmData.email && llmData.email.trim()) {
+            validatedData.emails.push({ type: 'work', email: llmData.email.toLowerCase().trim() });
+        } else if (fallbackData.emails && fallbackData.emails.length > 0) {
+            validatedData.emails = fallbackData.emails;
+        }
+
+        if (llmData.phone && llmData.phone.trim()) {
+            validatedData.phoneNumbers.push({ type: 'work', number: llmData.phone.trim() });
+        } else if (fallbackData.phoneNumbers && fallbackData.phoneNumbers.length > 0) {
+            validatedData.phoneNumbers = fallbackData.phoneNumbers;
+        }
+
+        console.log('✅ LLM response validated');
+        return validatedData;
+    }
+
+    _validateString(llmValue, fallbackValue) {
+        if (typeof llmValue === 'string' && llmValue.trim().length > 0) {
+            return llmValue.trim();
+        }
+        return fallbackValue || '';
     }
 
     _extractEmails(text, data, patterns) {
@@ -2412,6 +2601,188 @@ class ContactManager {
         const backupData = JSON.stringify(backup, null, 2);
         this.downloadFile(backupData, `contacts-backup-${new Date().toISOString().split('T')[0]}.json`, 'application/json');
         this.showToast('Backup created successfully', 'success');
+    }
+
+    // LLM Configuration Management
+    configureLLM(config) {
+        console.log('🤖 Configuring LLM settings...');
+
+        if (config.apiKey) {
+            this.llmConfig.apiKey = config.apiKey;
+            this.llmConfig.enabled = true;
+        }
+
+        if (config.baseURL) {
+            this.llmConfig.baseURL = config.baseURL;
+        }
+
+        if (config.model) {
+            this.llmConfig.model = config.model;
+        }
+
+        if (config.maxTokens) {
+            this.llmConfig.maxTokens = config.maxTokens;
+        }
+
+        if (config.temperature !== undefined) {
+            this.llmConfig.temperature = config.temperature;
+        }
+
+        // Save to localStorage
+        localStorage.setItem('llmConfig', JSON.stringify(this.llmConfig));
+
+        console.log('✅ LLM configuration updated:', {
+            enabled: this.llmConfig.enabled,
+            baseURL: this.llmConfig.baseURL,
+            model: this.llmConfig.model,
+            hasApiKey: !!this.llmConfig.apiKey
+        });
+
+        this.updateLLMStatus();
+    }
+
+    loadLLMConfig() {
+        const saved = localStorage.getItem('llmConfig');
+        if (saved) {
+            try {
+                const config = JSON.parse(saved);
+                this.llmConfig = { ...this.llmConfig, ...config };
+                console.log('📥 Loaded LLM config from storage');
+            } catch (error) {
+                console.error('❌ Failed to load LLM config:', error);
+            }
+        }
+        this.updateLLMStatus();
+    }
+
+    updateLLMStatus() {
+        const statusElement = document.getElementById('llm-status');
+        if (statusElement) {
+            if (this.llmConfig.enabled && this.llmConfig.apiKey) {
+                statusElement.textContent = '🤖 LLM Enabled';
+                statusElement.className = 'llm-status enabled';
+            } else {
+                statusElement.textContent = '🤖 LLM Disabled';
+                statusElement.className = 'llm-status disabled';
+            }
+        }
+    }
+
+    // Test LLM connection
+    async testLLMConnection() {
+        if (!this.llmConfig.enabled || !this.llmConfig.apiKey) {
+            throw new Error('LLM not configured');
+        }
+
+        try {
+            const response = await fetch(`${this.llmConfig.baseURL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.llmConfig.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: this.llmConfig.model,
+                    messages: [{ role: 'user', content: 'Hello' }],
+                    max_tokens: 10
+                })
+            });
+
+            if (response.ok) {
+                console.log('✅ LLM connection test successful');
+                return true;
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+        } catch (error) {
+            console.error('❌ LLM connection test failed:', error);
+            throw error;
+        }
+    }
+
+    // UI functions for LLM configuration
+    saveLLMConfig() {
+        const apiKey = document.getElementById('llm-api-key').value.trim();
+        const baseURL = document.getElementById('llm-base-url').value.trim() || 'https://api.openai.com/v1';
+        const model = document.getElementById('llm-model').value;
+
+        if (!apiKey) {
+            this.showToast('Please enter an API key', 'error');
+            return;
+        }
+
+        this.configureLLM({
+            apiKey,
+            baseURL,
+            model
+        });
+
+        this.showToast('LLM configuration saved successfully', 'success');
+        this.populateLLMForm(); // Refresh the form
+    }
+
+    async testLLMConnectionUI() {
+        const testBtn = document.getElementById('test-llm-connection');
+        const originalText = testBtn.textContent;
+
+        try {
+            testBtn.textContent = 'Testing...';
+            testBtn.disabled = true;
+
+            await this.testLLMConnection();
+            this.showToast('LLM connection successful!', 'success');
+
+        } catch (error) {
+            this.showToast(`Connection failed: ${error.message}`, 'error');
+        } finally {
+            testBtn.textContent = originalText;
+            testBtn.disabled = false;
+        }
+    }
+
+    disableLLM() {
+        this.llmConfig.enabled = false;
+        this.llmConfig.apiKey = '';
+        localStorage.removeItem('llmConfig');
+
+        this.updateLLMStatus();
+        this.populateLLMForm();
+        this.showToast('LLM disabled', 'info');
+    }
+
+    populateLLMForm() {
+        document.getElementById('llm-api-key').value = this.llmConfig.apiKey ? '••••••••••••••••' : '';
+        document.getElementById('llm-base-url').value = this.llmConfig.baseURL;
+        document.getElementById('llm-model').value = this.llmConfig.model;
+    }
+
+    // Import backup function (was missing)
+    async importBackup(file) {
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const backup = JSON.parse(text);
+
+            if (backup.contacts && Array.isArray(backup.contacts)) {
+                // Clear existing data
+                await this.clearAllData(false); // Don't show confirmation
+
+                // Import contacts
+                for (const contact of backup.contacts) {
+                    await this.saveContact(contact);
+                }
+
+                await this.loadContacts();
+                this.updateDashboard();
+                this.showToast(`Imported ${backup.contacts.length} contacts successfully`, 'success');
+            } else {
+                throw new Error('Invalid backup file format');
+            }
+        } catch (error) {
+            console.error('Import error:', error);
+            this.showToast('Failed to import backup', 'error');
+        }
     }
 }
 

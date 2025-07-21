@@ -329,6 +329,41 @@
 
                     <div class="card">
                         <div class="card__body">
+                            <h3>AI Enhancement <span id="llm-status" class="llm-status disabled">🤖 LLM Disabled</span></h3>
+                            <p>Configure AI-powered OCR validation for improved accuracy</p>
+                            <div class="llm-config">
+                                <div class="form-group">
+                                    <label for="llm-api-key">API Key</label>
+                                    <input type="password" id="llm-api-key" placeholder="Enter OpenAI-compatible API key" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="llm-base-url">Base URL</label>
+                                    <input type="text" id="llm-base-url" placeholder="https://api.openai.com/v1" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="llm-model">Model</label>
+                                    <select id="llm-model" class="form-control">
+                                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Recommended)</option>
+                                        <option value="gpt-4">GPT-4</option>
+                                        <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                        <option value="claude-3-haiku">Claude 3 Haiku</option>
+                                        <option value="claude-3-sonnet">Claude 3 Sonnet</option>
+                                    </select>
+                                </div>
+                                <div class="llm-actions">
+                                    <button class="btn btn--primary" id="save-llm-config">Save Configuration</button>
+                                    <button class="btn btn--outline" id="test-llm-connection">Test Connection</button>
+                                    <button class="btn btn--outline" id="disable-llm">Disable AI</button>
+                                </div>
+                                <div class="llm-info">
+                                    <small>💡 Supports OpenAI, Anthropic, OpenRouter, Together AI, and other OpenAI-compatible APIs</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card__body">
                             <h3>Data Management</h3>
                             <div class="data-actions">
                                 <button class="btn btn--outline" id="clear-all-data">Clear All Data</button>
