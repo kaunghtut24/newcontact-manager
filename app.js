@@ -72,20 +72,24 @@ class ContactManager {
     }
 
     async saveContact(contact) {
+        console.log('💾 saveContact called with:', contact);
+
         // Generate ID if new contact
         if (!contact.id) {
             contact.id = 'contact_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
         }
-        
+
         // Set timestamps
         const now = new Date().toISOString().split('T')[0];
         if (!contact.createdDate) {
             contact.createdDate = now;
         }
         contact.lastUpdated = now;
-        
+
         // Generate full name
         contact.fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+
+        console.log('📝 Prepared contact for saving:', contact);
         
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['contacts'], 'readwrite');
@@ -1669,25 +1673,44 @@ class ContactManager {
             // Try to create the missing container as a last resort
             if (scanResults && !container) {
                 console.log('🛠️ Attempting to create missing extracted-data container...');
+
+                // Create the extracted-data container
                 const newContainer = document.createElement('div');
                 newContainer.id = 'extracted-data';
                 newContainer.className = 'extracted-data';
 
-                // Find the right place to insert it (after the progress bar)
-                const progressBar = scanResults.querySelector('#ocr-progress');
-                if (progressBar) {
-                    progressBar.parentNode.insertBefore(newContainer, progressBar.nextSibling);
-                } else {
-                    // Just append to the card body
-                    const cardBody = scanResults.querySelector('.card__body');
-                    if (cardBody) {
-                        cardBody.appendChild(newContainer);
-                    }
-                }
+                // Create the scan-actions container with buttons
+                const scanActions = document.createElement('div');
+                scanActions.className = 'scan-actions';
+                scanActions.innerHTML = `
+                    <button class="btn btn--primary" id="save-scanned-contact">Save Contact</button>
+                    <button class="btn btn--outline" id="edit-scanned-contact">Edit Details</button>
+                    <button class="btn btn--outline" id="scan-another">Scan Another</button>
+                `;
 
-                console.log('✅ Created missing container, attempting to render...');
-                this._renderScanResults(scanResults, newContainer, extractedData, imageUrl);
-                return;
+                // Find the right place to insert them
+                const cardBody = scanResults.querySelector('.card__body');
+                if (cardBody) {
+                    // Find the progress bar to insert after it
+                    const progressBar = scanResults.querySelector('#ocr-progress');
+                    if (progressBar) {
+                        cardBody.insertBefore(newContainer, progressBar.nextSibling);
+                        cardBody.insertBefore(scanActions, newContainer.nextSibling);
+                    } else {
+                        // Just append to the card body
+                        cardBody.appendChild(newContainer);
+                        cardBody.appendChild(scanActions);
+                    }
+
+                    // Re-attach event listeners for the new buttons
+                    this._attachScanButtonListeners();
+
+                    console.log('✅ Created missing container and action buttons, attempting to render...');
+                    this._renderScanResults(scanResults, newContainer, extractedData, imageUrl);
+                    return;
+                } else {
+                    console.error('❌ Could not find card body to insert elements');
+                }
             }
 
             this.showToast('Error displaying scan results. Please try scanning again.', 'error');
@@ -1764,6 +1787,38 @@ class ContactManager {
         }
     }
 
+    // Re-attach event listeners for dynamically created scan buttons
+    _attachScanButtonListeners() {
+        console.log('🔗 Attaching scan button listeners...');
+
+        const saveBtn = document.getElementById('save-scanned-contact');
+        const editBtn = document.getElementById('edit-scanned-contact');
+        const scanAnotherBtn = document.getElementById('scan-another');
+
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                console.log('💾 Save button clicked');
+                this.saveScannedContact();
+            });
+        }
+
+        if (editBtn) {
+            editBtn.addEventListener('click', () => {
+                console.log('✏️ Edit button clicked');
+                this.editScannedContact();
+            });
+        }
+
+        if (scanAnotherBtn) {
+            scanAnotherBtn.addEventListener('click', () => {
+                console.log('🔄 Scan another button clicked');
+                this.resetScanInterface();
+            });
+        }
+
+        console.log('✅ Scan button listeners attached');
+    }
+
     // Test function that can be called from browser console
     testScanView() {
         console.log('🧪 Testing scan view...');
@@ -1774,18 +1829,48 @@ class ContactManager {
     }
 
     async saveScannedContact() {
-        if (!this.scannedContactData) return;
+        console.log('💾 Saving scanned contact:', this.scannedContactData);
 
-        this.scannedContactData.source = 'scan';
-        this.scannedContactData.category = 'professional';
+        if (!this.scannedContactData) {
+            console.error('❌ No scanned contact data to save');
+            this.showToast('No contact data to save', 'error');
+            return;
+        }
+
+        // Prepare the contact data
+        const contactData = {
+            ...this.scannedContactData,
+            source: 'scan',
+            category: 'professional',
+            id: Date.now().toString() // Generate unique ID
+        };
 
         try {
-            await this.saveContact(this.scannedContactData);
+            console.log('📝 Saving contact with data:', contactData);
+            await this.saveContact(contactData);
+            this.showToast('Contact saved successfully!', 'success');
             this.resetScanInterface();
             this.updateDashboard();
+            this.showView('contacts'); // Switch to contacts view to show the new contact
         } catch (error) {
-            console.error('Error saving scanned contact:', error);
+            console.error('❌ Error saving scanned contact:', error);
+            this.showToast('Error saving contact', 'error');
         }
+    }
+
+    editScannedContact() {
+        console.log('✏️ Editing scanned contact:', this.scannedContactData);
+
+        if (!this.scannedContactData) {
+            console.error('❌ No scanned contact data to edit');
+            this.showToast('No contact data to edit', 'error');
+            return;
+        }
+
+        // Switch to add contact view and populate with scanned data
+        this.showView('add-contact');
+        this.populateContactForm(this.scannedContactData);
+        this.showToast('Contact data loaded for editing', 'info');
     }
 
     resetScanInterface() {
