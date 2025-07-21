@@ -14,14 +14,56 @@ A modern, AI-powered contact management system with business card scanning capab
 - 💾 **Local Storage** - All data stored locally using IndexedDB
 - 📱 **Mobile Optimized** - Touch-friendly interface with swipe gestures
 - 🚀 **PWA Ready** - Installable as a Progressive Web App
+- 🤖 **AI Enhancement** - LLM-powered OCR validation for improved accuracy
+
+## 🤖 AI Enhancement Features
+
+The AI Contact Manager includes optional LLM integration that dramatically improves OCR accuracy:
+
+### Before AI Enhancement
+```javascript
+// Basic OCR might extract:
+{
+  firstName: "JOHN",           // ❌ All caps
+  lastName: "",                // ❌ Missing
+  company: "SMITH",            // ❌ Wrong field
+  jobTitle: "SENIOR",          // ❌ Incomplete
+}
+```
+
+### After AI Enhancement
+```javascript
+// AI-corrected extraction:
+{
+  firstName: "John",                          // ✅ Proper case
+  lastName: "Smith",                         // ✅ Correctly extracted
+  company: "Aminia Hospitality Pvt. Ltd",   // ✅ Complete company name
+  jobTitle: "Senior Director",               // ✅ Full title
+}
+```
+
+### Supported LLM Providers
+- **OpenAI** (GPT-3.5, GPT-4) - Best quality
+- **OpenRouter** (Multiple models) - Best cost/quality ratio
+- **Together AI** (Llama, etc.) - Fastest & cheapest
+- **Anthropic** (Claude) - High quality alternative
+
+### Cost Comparison
+| Provider | Cost per Business Card | Setup Difficulty |
+|----------|----------------------|------------------|
+| OpenRouter | ~$0.0005 | Easy |
+| Together AI | ~$0.0002 | Easy |
+| OpenAI | ~$0.001 | Easy |
+| Anthropic | ~$0.0008 | Medium |
 
 ## Technologies Used
 
 - **Frontend**: Vanilla JavaScript, HTML5, CSS3
 - **OCR**: Tesseract.js for business card text extraction
+- **AI Enhancement**: OpenAI-compatible LLM integration for improved OCR accuracy
 - **Storage**: IndexedDB for local data persistence
 - **File Processing**: SheetJS for Excel import/export
-- **Deployment**: Netlify static hosting
+- **Deployment**: Netlify, Vercel, Railway, Render static hosting
 
 ## Local Development
 
@@ -48,6 +90,40 @@ A modern, AI-powered contact management system with business card scanning capab
 - `npm run dev` - Start development server with live reload
 - `npm run serve` - Serve on port 8080
 - `npm run preview` - Preview build on port 4173
+
+## 🚀 Deployment with AI Enhancement
+
+The AI Contact Manager supports LLM integration for dramatically improved OCR accuracy. Set up environment variables for secure API key management.
+
+### Quick Deploy to Netlify
+
+1. **Get an API key** from your preferred LLM provider:
+   - [OpenAI](https://platform.openai.com) (Recommended for quality)
+   - [OpenRouter](https://openrouter.ai) (Recommended for cost)
+   - [Together AI](https://api.together.xyz) (Fastest & cheapest)
+
+2. **Add environment variable** in Netlify:
+   ```
+   LLM_API_KEY=your-api-key-here
+   ```
+
+3. **Deploy** - LLM will be automatically enabled!
+
+### 📚 Deployment Guides
+
+- **[🚀 QUICK_DEPLOY.md](QUICK_DEPLOY.md)** - Fast setup for common scenarios
+- **[📖 DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)** - Complete deployment guide
+- **[🔧 TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+- **[⚙️ ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md)** - Environment variables reference
+
+### Supported Platforms
+
+| Platform | Guide | Auto-Deploy | Environment Variables |
+|----------|-------|-------------|----------------------|
+| **Netlify** | [Quick Deploy](QUICK_DEPLOY.md#netlify-most-popular) | ✅ | ✅ |
+| **Vercel** | [Deployment Guide](DEPLOYMENT_GUIDE.md#vercel-deployment) | ✅ | ✅ |
+| **Railway** | [Deployment Guide](DEPLOYMENT_GUIDE.md#railway-deployment) | ✅ | ✅ |
+| **Render** | [Deployment Guide](DEPLOYMENT_GUIDE.md#render-deployment) | ✅ | ✅ |
 
 ## Deployment to Netlify
 

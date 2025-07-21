@@ -1770,7 +1770,7 @@ class ContactManager {
             }
 
             console.log('🚀 Starting Tesseract.recognize...');
-            // Use Tesseract.recognize directly without workers to avoid cloning issues
+            // Configure Tesseract with explicit worker paths to avoid CSP issues
             const result = await Tesseract.recognize(imageUrl, 'eng', {
                 logger: (m) => {
                     console.log('📊 OCR Progress:', m);
@@ -1780,7 +1780,11 @@ class ContactManager {
                         progressText.textContent = `Processing image... ${progress}%`;
                         console.log(`📈 Progress: ${progress}%`);
                     }
-                }
+                },
+                // Explicit paths to avoid blob: URLs that violate CSP
+                workerPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/worker.min.js',
+                langPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/',
+                corePath: 'https://unpkg.com/tesseract.js@4.1.1/dist/'
             });
             console.log('✅ Tesseract.recognize completed');
 
@@ -1795,23 +1799,38 @@ class ContactManager {
             return result.data.text;
 
         } catch (error) {
-            console.error('OCR Error:', error);
+            console.error('❌ OCR Error:', error);
+            console.error('❌ Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
 
             // Hide progress container
             if (progressContainer) {
                 progressContainer.classList.add('hidden');
             }
 
-            // Provide user-friendly error messages
+            // Provide user-friendly error messages with specific solutions
             let errorMessage = 'OCR processing failed';
-            if (error.message.includes('network') || error.message.includes('fetch')) {
-                errorMessage = 'Network error. Please check your internet connection and try again.';
-            } else if (error.message.includes('cloned') || error.message.includes('Worker')) {
-                errorMessage = 'OCR engine compatibility issue. This may work better in a different browser.';
+            let suggestion = 'Please try again or use a different image.';
+
+            if (error.message.includes('Content Security Policy') || error.message.includes('Worker')) {
+                errorMessage = 'Browser security settings are blocking OCR processing.';
+                suggestion = 'The page has been updated to fix this. Please refresh and try again.';
+            } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                errorMessage = 'Network error during OCR processing.';
+                suggestion = 'Please check your internet connection and try again.';
             } else if (error.message.includes('timeout')) {
-                errorMessage = 'OCR processing took too long. Try with a smaller or clearer image.';
+                errorMessage = 'OCR processing took too long.';
+                suggestion = 'Try with a smaller, clearer image with better lighting.';
+            } else if (error.message.includes('cloned')) {
+                errorMessage = 'OCR engine initialization failed.';
+                suggestion = 'Please refresh the page and try again.';
             }
 
+            // Show user-friendly error with suggestion
+            this.showToast(`${errorMessage} ${suggestion}`, 'error');
             throw new Error(errorMessage);
         }
     }
@@ -3085,5 +3104,5 @@ Important:
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
-    new ContactManager();
+    window.contactManager = new ContactManager();
 });
