@@ -1770,7 +1770,8 @@ class ContactManager {
             }
 
             console.log('🚀 Starting Tesseract.recognize...');
-            // Configure Tesseract with explicit worker paths to avoid CSP issues
+
+            // Use simple configuration that should work with updated CSP
             const result = await Tesseract.recognize(imageUrl, 'eng', {
                 logger: (m) => {
                     console.log('📊 OCR Progress:', m);
@@ -1780,11 +1781,7 @@ class ContactManager {
                         progressText.textContent = `Processing image... ${progress}%`;
                         console.log(`📈 Progress: ${progress}%`);
                     }
-                },
-                // Explicit paths to avoid blob: URLs that violate CSP
-                workerPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/worker.min.js',
-                langPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/',
-                corePath: 'https://unpkg.com/tesseract.js@4.1.1/dist/'
+                }
             });
             console.log('✅ Tesseract.recognize completed');
 
@@ -1815,18 +1812,24 @@ class ContactManager {
             let errorMessage = 'OCR processing failed';
             let suggestion = 'Please try again or use a different image.';
 
-            if (error.message.includes('Content Security Policy') || error.message.includes('Worker')) {
+            // Safely check error message
+            const errorText = error?.message || error?.toString() || 'Unknown error';
+
+            if (errorText.includes('Content Security Policy') || errorText.includes('Worker')) {
                 errorMessage = 'Browser security settings are blocking OCR processing.';
                 suggestion = 'The page has been updated to fix this. Please refresh and try again.';
-            } else if (error.message.includes('network') || error.message.includes('fetch')) {
+            } else if (errorText.includes('network') || errorText.includes('fetch') || errorText.includes('NetworkError')) {
                 errorMessage = 'Network error during OCR processing.';
                 suggestion = 'Please check your internet connection and try again.';
-            } else if (error.message.includes('timeout')) {
+            } else if (errorText.includes('timeout')) {
                 errorMessage = 'OCR processing took too long.';
                 suggestion = 'Try with a smaller, clearer image with better lighting.';
-            } else if (error.message.includes('cloned')) {
+            } else if (errorText.includes('cloned')) {
                 errorMessage = 'OCR engine initialization failed.';
                 suggestion = 'Please refresh the page and try again.';
+            } else if (errorText.includes('importScripts') || errorText.includes('wasm') || errorText.includes('WASM')) {
+                errorMessage = 'OCR engine resources failed to load.';
+                suggestion = 'This may be a temporary network issue. Please refresh and try again.';
             }
 
             // Show user-friendly error with suggestion
