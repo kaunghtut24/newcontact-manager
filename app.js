@@ -1771,22 +1771,62 @@ class ContactManager {
 
             console.log('🚀 Starting Tesseract.recognize...');
 
-            // Configure Tesseract with explicit CDN paths to ensure CSP compliance
-            const result = await Tesseract.recognize(imageUrl, 'eng', {
-                logger: (m) => {
-                    console.log('📊 OCR Progress:', m);
-                    if (m.status === 'recognizing text' && progressBar && progressText) {
-                        const progress = Math.round(m.progress * 100);
-                        progressBar.style.width = progress + '%';
-                        progressText.textContent = `Processing image... ${progress}%`;
-                        console.log(`📈 Progress: ${progress}%`);
-                    }
-                },
-                // Explicitly use unpkg.com to match our CSP
-                workerPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/worker.min.js',
-                langPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/',
-                corePath: 'https://unpkg.com/tesseract.js@4.1.1/dist/'
-            });
+            // Try multiple approaches to ensure Tesseract works with CSP
+            let result;
+
+            try {
+                console.log('🔄 Attempting OCR with explicit unpkg.com paths...');
+                // First attempt: Force unpkg.com paths
+                result = await Tesseract.recognize(imageUrl, 'eng', {
+                    logger: (m) => {
+                        console.log('📊 OCR Progress:', m);
+                        if (m.status === 'recognizing text' && progressBar && progressText) {
+                            const progress = Math.round(m.progress * 100);
+                            progressBar.style.width = progress + '%';
+                            progressText.textContent = `Processing image... ${progress}%`;
+                            console.log(`📈 Progress: ${progress}%`);
+                        }
+                    },
+                    // Force unpkg.com to match our CSP
+                    workerPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/worker.min.js',
+                    langPath: 'https://unpkg.com/tesseract.js@4.1.1/dist/',
+                    corePath: 'https://unpkg.com/tesseract.js@4.1.1/dist/'
+                });
+            } catch (unpkgError) {
+                console.log('⚠️ unpkg.com failed, trying cdnjs.cloudflare.com...');
+                try {
+                    // Second attempt: Use cdnjs.cloudflare.com
+                    result = await Tesseract.recognize(imageUrl, 'eng', {
+                        logger: (m) => {
+                            console.log('📊 OCR Progress:', m);
+                            if (m.status === 'recognizing text' && progressBar && progressText) {
+                                const progress = Math.round(m.progress * 100);
+                                progressBar.style.width = progress + '%';
+                                progressText.textContent = `Processing image... ${progress}%`;
+                                console.log(`📈 Progress: ${progress}%`);
+                            }
+                        },
+                        // Try cdnjs as fallback
+                        workerPath: 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/worker.min.js',
+                        langPath: 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/',
+                        corePath: 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/'
+                    });
+                } catch (cdnjsError) {
+                    console.log('⚠️ cdnjs failed, trying default configuration...');
+                    // Final attempt: Default configuration (should work with updated CSP)
+                    result = await Tesseract.recognize(imageUrl, 'eng', {
+                        logger: (m) => {
+                            console.log('📊 OCR Progress:', m);
+                            if (m.status === 'recognizing text' && progressBar && progressText) {
+                                const progress = Math.round(m.progress * 100);
+                                progressBar.style.width = progress + '%';
+                                progressText.textContent = `Processing image... ${progress}%`;
+                                console.log(`📈 Progress: ${progress}%`);
+                            }
+                        }
+                    });
+                }
+            }
             console.log('✅ Tesseract.recognize completed');
 
             if (progressContainer) {
@@ -1819,9 +1859,12 @@ class ContactManager {
             // Safely check error message
             const errorText = error?.message || error?.toString() || 'Unknown error';
 
-            if (errorText.includes('Content Security Policy') || errorText.includes('Worker')) {
-                errorMessage = 'Browser security settings are blocking OCR processing.';
-                suggestion = 'The page has been updated to fix this. Please refresh and try again.';
+            if (errorText.includes('Content Security Policy') || errorText.includes('script-src') || errorText.includes('violates the following directive')) {
+                errorMessage = 'Browser security policy is blocking OCR resources.';
+                suggestion = 'The page has been updated to fix this. Please hard refresh (Ctrl+Shift+R) and try again.';
+            } else if (errorText.includes('Worker') || errorText.includes('importScripts')) {
+                errorMessage = 'OCR worker failed to load.';
+                suggestion = 'This may be a CDN issue. Please refresh and try again, or try a different browser.';
             } else if (errorText.includes('network') || errorText.includes('fetch') || errorText.includes('NetworkError')) {
                 errorMessage = 'Network error during OCR processing.';
                 suggestion = 'Please check your internet connection and try again.';
@@ -1831,9 +1874,12 @@ class ContactManager {
             } else if (errorText.includes('cloned')) {
                 errorMessage = 'OCR engine initialization failed.';
                 suggestion = 'Please refresh the page and try again.';
-            } else if (errorText.includes('importScripts') || errorText.includes('wasm') || errorText.includes('WASM')) {
+            } else if (errorText.includes('wasm') || errorText.includes('WASM')) {
                 errorMessage = 'OCR engine resources failed to load.';
                 suggestion = 'This may be a temporary network issue. Please refresh and try again.';
+            } else if (errorText.includes('cdn.jsdelivr.net') || errorText.includes('unpkg.com')) {
+                errorMessage = 'OCR resources could not be loaded from CDN.';
+                suggestion = 'CDN may be temporarily unavailable. Please try again in a few minutes.';
             }
 
             // Show user-friendly error with suggestion
