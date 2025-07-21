@@ -116,14 +116,52 @@ The `netlify.toml` file includes:
 - Business card images are processed locally using Tesseract.js
 - Secure headers configured for production deployment
 
-## Contributing
+## 🚀 Quick Deploy to Netlify
+
+### Option 1: One-Click Deploy
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/kaunghtut24/newcontact-manager)
+
+### Option 2: Manual Deploy
+1. Run the build script: `./build.sh`
+2. Drag the `dist` folder to [netlify.com](https://netlify.com)
+3. Your app is live!
+
+## 📁 Project Structure
+
+```
+ai-contact-manager/
+├── index.html          # Main application
+├── app.js             # Core functionality
+├── style.css          # Responsive styles
+├── manifest.json      # PWA configuration
+├── netlify.toml       # Deployment config
+├── _redirects         # SPA routing
+├── build.sh           # Build script
+├── server.js          # Local dev server
+├── package.json       # Dependencies
+├── README.md          # Documentation
+├── DEPLOYMENT.md      # Deploy guide
+├── MOBILE_GUIDE.md    # Mobile features
+├── QUICKSTART.md      # Quick start
+└── dist/              # Built files
+```
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+4. Test thoroughly on mobile and desktop
+5. Commit: `git commit -m 'Add amazing feature'`
+6. Push: `git push origin feature/amazing-feature`
+7. Submit a pull request
 
-## License
+## 📄 License
 
-MIT License - see LICENSE file for details
+MIT License - Feel free to use this project for personal or commercial purposes.
+
+## 🙏 Acknowledgments
+
+- [Tesseract.js](https://tesseract.projectnaptha.com/) for OCR functionality
+- [SheetJS](https://sheetjs.com/) for Excel file processing
+- Modern web APIs for camera and file access

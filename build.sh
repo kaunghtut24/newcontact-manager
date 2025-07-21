@@ -18,6 +18,10 @@ cp netlify.toml dist/
 cp _redirects dist/
 
 # Copy additional files if they exist
+if [ -f "favicon.svg" ]; then
+    cp favicon.svg dist/
+fi
+
 if [ -f "favicon.ico" ]; then
     cp favicon.ico dist/
 fi
